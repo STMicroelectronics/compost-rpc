@@ -1,0 +1,38 @@
+[project]
+name = "compost_rpc"
+dynamic = ["version"]
+description = "Compost RPC protocol generator"
+authors = [
+  { name = "Radovan Blažek", email = "radovan.blazek@st.com" },
+  { name = "Petr Moucha", email = "petr.moucha@st.com" },
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+keywords = ["protocol", "RPC", "MCU", "embedded"]
+
+[project.optional-dependencies]
+serial = ["pyserial==3.*"]
+addons = ["colorful==0.5.*"]
+test = ["pytest==8.3.*"]
+docs = ["sphinx==8.1.3", "myst-parser==4.0.1", "furo==2024.8.6", "breathe==4.36.0"]
+
+[project.urls]
+Issues = "https://github.com/STMicroelectronics/compost-rpc/issues"
+Source = "https://github.com/STMicroelectronics/compost-rpc"
+
+[tool.ruff]
+# Allow lines to be as long as 120.
+# The default is impractical due to the code generation strings
+line-length = 120
+
+[tool.setuptools.packages.find]
+include = ["compost_rpc"]
+exclude = ["csharp"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "compost_rpc/compost_rpc.py"

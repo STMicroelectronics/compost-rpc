@@ -1,2 +1,10 @@
-# compost-rpc
-Code generator tool for generic MCU communication protocol. This repository contains the generator tool that builds the embedded code for a generic MCU with a C11 compiler and the PC client.
+# Compost
+
+Compost is a Remote Procedure Call (RPC) protocol generator with a simple wire
+format.
+
+It abstracts communication between a PC and an MCU. Basically it allows you to
+call functions on your MCU from a PC.
+
+Compost is meant to be used over any medium, but it's simplicity is best suited
+for UART/RS232 or UDP/IP.

@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;netstandard2.1;net8.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>CompostRpc</AssemblyName>
+    <AssemblyTitle>CompostRpc</AssemblyTitle>
+    <PackageId>CompostRpc</PackageId>
+    <AssemblyVersion>0.0.0.0</AssemblyVersion>
+    <VersionPrefix>0.0.0</VersionPrefix>
+    <Authors>Petr Moucha</Authors>
+    <Company>STMicroelectronics</Company>
+    <Product>Compost RPC</Product>
+    <Copyright>Copyright © STMicroelectronics 2022</Copyright>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <Description>Library for creating a Compost RPC protocol client.</Description>
+    <PackageProjectUrl>https://www.nuget.org/packages/CompostRpc</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/STMicroelectronics/compost-rpc</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <Tags>rpc,serial,embedded</Tags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
+    <None Include="../../../LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="System.Memory" Version="4.6.*" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.IO.Ports" Version="9.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="GitVersion.MSBuild" Version="6.3.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!-- Disable warnings about folder structure that matches namespaces -->
+    <!-- Disable refactor suggestions for index/range operators -->
+    <NoWarn>$(NoWarn);IDE0130;IDE0057</NoWarn>
+  </PropertyGroup>
+
+</Project>
