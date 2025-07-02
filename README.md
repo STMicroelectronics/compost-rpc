@@ -191,7 +191,7 @@ files with C code in your current directory.
 You need to add all of these files to your C project.
 
 For more information about code generation check out
-[Generating code](./docs/user_guide/generating_code).
+[Generating code](./docs/user_guide/generating_code.md).
 
 ### Integration on the MCU side
 
