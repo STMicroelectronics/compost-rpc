@@ -104,7 +104,7 @@ for communication, you also need to install pyserial.
 pip install pyserial
 ```
 
-## Download Compost
+### Download Compost
 
 Python package management is out of the scope of this tutorial. Compost supports
 usage as an installed package, but also without installation. We will use the
@@ -126,7 +126,7 @@ Pyserial found.
 This module does nothing when called as a script, it's only usable as a library.
 ```
 
-## Defining the protocol
+### Defining the protocol
 
 Compost uses the Python language itself to define the protocol. You may be more
 familiar with the name "interface" instead of "protocol". We are talking about a
@@ -161,7 +161,7 @@ We call the Python file with function prototypes the protocol definition file.
 
 From the protocol definition Compost can generate code for other languages.
 
-## Generating C code
+### Generating C code
 
 We use the same protocol definition file as a script that will generate the
 code.
@@ -193,7 +193,7 @@ You need to add all of these files to your C project.
 For more information about code generation check out
 [Generating code](./docs/user_guide/generating_code).
 
-## Integration on the MCU side
+### Integration on the MCU side
 
 The main entry point to Compost in C language is the function
 `compost_msg_process()`. You have to call this function for every received
@@ -255,7 +255,7 @@ make: *** [Makefile:83: SPC582B60_Main] Error 1
 This is a feature of Compost - you have to implement all of the remote
 functions.
 
-### Implement the remote function in C
+#### Implement the remote function in C
 
 In C you define body of the function you would like to call remotely.
 Compost generates the C function prototype for you from the protocol definition
@@ -309,7 +309,7 @@ Thats it! We called a function in Python but it was executed on an MCU.
 
 See other Python interface usage examples in [example script](./example_script.py).
 
-## Deep dive
+### Deep dive
 
 Roughly, this is what happens when you call `rpc.adc_read(0)`:
 
