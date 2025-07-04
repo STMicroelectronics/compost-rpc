@@ -31,11 +31,9 @@ with the return value. The response is sent to PC. Compost on the PC parses the
 message and the function you called on the PC returns the value you provided in
 the MCU.
 
-The following diagram tries to illustrate how Compost works and to show what is
-provided and what has to be implemented by the user.
+Simplified functionality diagram:
 
-![Functional overview for light mode](docs/_static/image/getting_started/overview-light.svg#gh-light-mode-only)
-![Functional overview for dark mode](docs/_static/image/getting_started/overview-dark.svg#gh-dark-mode-only)
+![Functional overview](docs/_static/image/getting_started/compost-simple.svg)
 
 ## Features
 
