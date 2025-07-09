@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 # Hack to import compost_rpc from the parent directory without installing it
-sys.path.append(str(Path(__file__).resolve().parents[1]))
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from compost_rpc import rpc, U32, Protocol, Generator
 
