@@ -29,13 +29,11 @@ documentation = "https://github.com/STMicroelectronics/compost-rpc/wiki"
 # The default is impractical due to the code generation strings
 line-length = 120
 
-[tool.setuptools.packages.find]
-include = ["compost_rpc"]
-exclude = ["csharp"]
-
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.7.19,<0.8.0"]
+build-backend = "uv_build"
 
-[tool.hatch.version]
-path = "compost_rpc/compost_rpc.py"
+[tool.uv.build-backend]
+module-name = "compost_rpc"
+module-root = ""
+
