@@ -10,6 +10,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
 keywords = ["protocol", "RPC", "MCU", "embedded"]
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 
 [project.optional-dependencies]
 serial = ["pyserial==3.*"]
@@ -20,6 +22,7 @@ docs = ["sphinx==8.1.3", "myst-parser==4.0.1", "furo==2024.8.6", "breathe==4.36.
 [project.urls]
 Issues = "https://github.com/STMicroelectronics/compost-rpc/issues"
 Source = "https://github.com/STMicroelectronics/compost-rpc"
+documentation = "https://github.com/STMicroelectronics/compost-rpc/wiki"
 
 [tool.ruff]
 # Allow lines to be as long as 120.
