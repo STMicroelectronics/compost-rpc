@@ -58,7 +58,7 @@ def target(msg: str = None, dependencies: set[str] = frozenset()):
 
     return decorator
 
-def run (args : list[str], **kwargs):
+def run(args: list[str], **kwargs):
     if "check" not in kwargs:
         kwargs["check"] = True
     print(f"Running command: {' '.join(args)}")
@@ -84,6 +84,7 @@ def version():
     content = re.sub(r'^__version__\s*=.*$', f"__version__ = \"{python_ver}\"", content, flags=re.MULTILINE)
     with open("../compost_rpc/compost_rpc.py", "w") as file:
         file.write(content)
+    run(["uv", "version", python_ver])
     print(f"Detected version {python_ver} from Git repository.")
 
 @target("Generating code")
