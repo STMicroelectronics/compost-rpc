@@ -1,9 +1,14 @@
 #include <stdint.h>
 #include <stdio.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
+
+#ifdef _WIN32
+    #include <winsock2.h>
+#else
+    #include <netinet/in.h>
+    #include <sys/socket.h>
+    #include <sys/types.h>
+    #include <unistd.h>
+#endif
 
 #include "compost.h"
 
@@ -18,6 +23,12 @@ uint32_t add_int_handler(uint32_t a, uint32_t b)
 
 int main(int argc, char *argv[])
 {
+    #ifdef _WIN32
+        WSADATA wsaData;
+        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+            exit(1);
+    #endif
+
     struct sockaddr_in sockaddr;
     sockaddr.sin_family = AF_INET;
     sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -51,9 +62,21 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "error\n");
             }
         }
+
+        #ifdef _WIN32
+            closesocket(connection);
+        #else
+            close(connection);
+        #endif
     }
 
-    close(sock);
+    #ifdef _WIN32
+        closesocket(connection);
+        closesocket(sock);
+        WSACleanup();
+    #else
+        close(sock);
+    #endif
 
     return 0;
 }
