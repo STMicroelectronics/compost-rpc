@@ -3,6 +3,7 @@
 
 #ifdef _WIN32
     #include <winsock2.h>
+    #include <ws2tcpip.h>
 #else
     #include <netinet/in.h>
     #include <sys/socket.h>
@@ -24,9 +25,18 @@ uint32_t add_int_handler(uint32_t a, uint32_t b)
 int main(int argc, char *argv[])
 {
     #ifdef _WIN32
-        WSADATA wsaData;
-        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-            exit(1);
+		WSADATA wsaData;
+
+		if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+			fprintf(stderr, "WSAStartup failed.\n");
+			exit(1);
+		}
+
+		if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2) {
+			fprintf(stderr, "Versiion 2.2 of Winsock is not available.\n");
+			WSACleanup();
+			exit(2);
+		}
     #endif
 
     struct sockaddr_in sockaddr;
@@ -46,16 +56,29 @@ int main(int argc, char *argv[])
         int connection = accept(sock, (struct sockaddr *)&client_sockaddr_in, &len);
 
         for (;;) {
-
-            if (read(connection, rx_buf, 1) < 1)
-                break;
-            if (read(connection, rx_buf + 1, 3 + 4 * rx_buf[0]) < 1)
-                break;
+            
+            #ifdef _WIN32
+                if (recv(connection, rx_buf, 1, 0) < 1)
+            #else
+                if (read(connection, rx_buf, 1) < 1)
+            #endif
+                    break;
+            
+            #ifdef _WIN32
+                if (recv(connection, rx_buf + 1, 3 + 4 * rx_buf[0], 0) < 1)
+            #else
+                if (read(connection, rx_buf + 1, 3 + 4 * rx_buf[0]) < 1)
+            #endif
+                    break;
 
             int16_t msg_size = compost_msg_process(tx_buf, sizeof(tx_buf), rx_buf, 4 + 4 * rx_buf[0]);
 
             if (msg_size > 0) {
-                write(connection, tx_buf, msg_size);
+                #ifdef _WIN32
+                    send(connection, tx_buf, msg_size, 0);
+                #else
+                    write(connection, tx_buf, msg_size);
+                #endif
             } else if (msg_size == 0) {
                 // No response to send
             } else {
