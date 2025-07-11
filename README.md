@@ -11,7 +11,7 @@ for UART/RS232 or UDP/IP.
 
 ## Install
 
-Packages are coming soon...
+    pip install compost_rpc
 
 ## Documentation
 
@@ -77,10 +77,24 @@ Simplified functionality diagram:
 
 You just need Python and a C compiler like GCC to run our single PC example.
 
+Clone the repository and enter the directory with the example:
+
     git clone https://github.com/STMicroelectronics/compost-rpc.git
     cd compost-rpc/examples/pc_to_pc
+
+Generate C code from the protocol definition:
+
     python protocol_def.py
+
+Compile the server:
+
+On Linux or macOS:
+
     gcc -o server main.c compost.c
+
+On Windows:
+
+    gcc -o server main.c compost.c -lws2_32
 
 In one terminal run the C server:
 
