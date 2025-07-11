@@ -71,7 +71,6 @@ int main(int argc, char *argv[])
     }
 
     #ifdef _WIN32
-        closesocket(connection);
         closesocket(sock);
         WSACleanup();
     #else
