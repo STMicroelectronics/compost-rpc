@@ -18,22 +18,27 @@ source_parts.append(SourcePart(False,'''/** @file
 
 #ifndef COMPOST_ALLOW_SMALL_INT
 #if INT_MAX < 2147483647
-#error "int is smaller than 32b - Compost expects Enums to have 32b. You can allow smaller int by defining macro COMPOST_ALLOW_SMALL_INT"
+#error \\
+    "int is smaller than 32b - Compost expects Enums to have 32b. You can allow smaller int by defining macro COMPOST_ALLOW_SMALL_INT"
 #endif
 #endif
 
 #ifdef COMPOST_DEBUG
-#define COMPOST_ASSERT(expr)                               \\
-    do {                                                   \\
-        if (!(expr)) {                                     \\
-            if (compost_assert_func != NULL) {             \\
-                compost_assert_func(__LINE__);             \\
-            }                                              \\
-            while(1);                                      \\
-        }                                                  \\
+#define COMPOST_ASSERT(expr)                   \\
+    do {                                       \\
+        if (!(expr)) {                         \\
+            if (compost_assert_func != NULL) { \\
+                compost_assert_func(__LINE__); \\
+            }                                  \\
+            while (1)                          \\
+                ;                              \\
+        }                                      \\
     } while (0)
 #else
-#define COMPOST_ASSERT(expr) do { (void)sizeof(expr); } while (0)
+#define COMPOST_ASSERT(expr) \\
+    do {                     \\
+        (void)sizeof(expr);  \\
+    } while (0)
 #endif
 
 #define LEN_OFFSET                0
@@ -42,11 +47,11 @@ source_parts.append(SourcePart(False,'''/** @file
 #define RPC_ID_LO_OFFSET          3
 #define PAYLOAD_OFFSET            4
 
-#define RPC_ID_HI_MASK   0x0F
-#define FLAGS_MASK       0xF0
-#define RESP_MASK        0x10
+#define RPC_ID_HI_MASK 0x0F
+#define FLAGS_MASK     0xF0
+#define RESP_MASK      0x10
 
-static void(*compost_assert_func)(uint32_t line) = NULL;
+static void (*compost_assert_func)(uint32_t line) = NULL;
 
 void compost_invoke_switch(struct CompostMsg *tx, const struct CompostMsg rx);
 
@@ -110,7 +115,7 @@ static inline void compost_u8_store(uint8_t **dest, uint8_t src)
  */
 static inline int8_t compost_i8_load(const uint8_t **src)
 {
-    return (int8_t) compost_u8_load(src);
+    return (int8_t)compost_u8_load(src);
 }
 
 /**
@@ -126,9 +131,7 @@ static inline void compost_i8_store(uint8_t **dest, int8_t src)
  */
 static inline uint16_t compost_u16_load(const uint8_t **src)
 {
-    uint16_t val =
-        ((uint16_t)(*src)[0] << 8) |
-        ((uint16_t)(*src)[1]);
+    uint16_t val = ((uint16_t)(*src)[0] << 8) | ((uint16_t)(*src)[1]);
     *src += sizeof(uint16_t);
     return val;
 }
@@ -164,11 +167,8 @@ static inline void compost_i16_store(uint8_t **dest, int16_t src)
  */
 static inline uint32_t compost_u32_load(const uint8_t **src)
 {
-    uint32_t val =
-        ((uint32_t)(*src)[0] << 24) |
-        ((uint32_t)(*src)[1] << 16) |
-        ((uint32_t)(*src)[2] << 8)  |
-        ((uint32_t)(*src)[3]);
+    uint32_t val = ((uint32_t)(*src)[0] << 24) | ((uint32_t)(*src)[1] << 16) |
+                   ((uint32_t)(*src)[2] << 8) | ((uint32_t)(*src)[3]);
     *src += sizeof(uint32_t);
     return val;
 }
@@ -206,15 +206,10 @@ static inline void compost_i32_store(uint8_t **dest, int32_t src)
  */
 static inline uint64_t compost_u64_load(const uint8_t **src)
 {
-    uint64_t val =
-        ((uint64_t)(*src)[0] << 56) |
-        ((uint64_t)(*src)[1] << 48) |
-        ((uint64_t)(*src)[2] << 40) |
-        ((uint64_t)(*src)[3] << 32) |
-        ((uint64_t)(*src)[4] << 24) |
-        ((uint64_t)(*src)[5] << 16) |
-        ((uint64_t)(*src)[6] << 8)  |
-        ((uint64_t)(*src)[7]);
+    uint64_t val = ((uint64_t)(*src)[0] << 56) | ((uint64_t)(*src)[1] << 48) |
+                   ((uint64_t)(*src)[2] << 40) | ((uint64_t)(*src)[3] << 32) |
+                   ((uint64_t)(*src)[4] << 24) | ((uint64_t)(*src)[5] << 16) |
+                   ((uint64_t)(*src)[6] << 8) | ((uint64_t)(*src)[7]);
     *src += sizeof(uint64_t);
     return val;
 }
@@ -240,7 +235,7 @@ static inline void compost_u64_store(uint8_t **dest, uint64_t src)
  */
 static inline int64_t compost_i64_load(const uint8_t **src)
 {
-    return (int64_t) compost_u64_load(src);
+    return (int64_t)compost_u64_load(src);
 }
 
 /**
@@ -296,7 +291,7 @@ static inline void compost_f64_store(uint8_t **dest, double src)
 /**
  * Loads bit precise integer from the backing value
  */
-uint32_t compost_bituint_load(const uint8_t* src, uint32_t offset_bits, uint32_t size_bits)
+uint32_t compost_bituint_load(const uint8_t *src, uint32_t offset_bits, uint32_t size_bits)
 {
     COMPOST_ASSERT(src != NULL);
     uint64_t val = 0;
@@ -323,7 +318,7 @@ uint32_t compost_bituint_load(const uint8_t* src, uint32_t offset_bits, uint32_t
 /**
  * Stores bit precise integer to the backing value
  */
-void compost_bituint_store(uint8_t* dest, uint32_t value, uint32_t offset_bits, uint32_t size_bits)
+void compost_bituint_store(uint8_t *dest, uint32_t value, uint32_t offset_bits, uint32_t size_bits)
 {
     COMPOST_ASSERT(dest != NULL);
     uint32_t byte_index = offset_bits / 8;
@@ -350,7 +345,7 @@ source_parts.append(SourcePart(True,'''
 static inline struct CompostSlice${struct_suffix} compost_slice_${fn_suffix}_load(const uint8_t **src)
 {
     uint16_t len = compost_u16_load(src);
-    struct CompostSlice${struct_suffix} ret = (struct CompostSlice${struct_suffix}){ .ptr = (uint8_t*)(*src), .len = len / sizeof(${type}) };
+    struct CompostSlice${struct_suffix} ret = (struct CompostSlice${struct_suffix}){.ptr = (uint8_t *)(*src), .len = len / sizeof(${type})};
     *src += len;
     return ret;
 }
@@ -474,7 +469,7 @@ int16_t compost_msg_process(uint8_t *tx_buf, const uint16_t tx_buf_size, uint8_t
     }
 }
 
-void compost_set_assert_func(void(*assert_func)(uint32_t line))
+void compost_set_assert_func(void (*assert_func)(uint32_t line))
 {
     compost_assert_func = assert_func;
 }
@@ -484,7 +479,7 @@ void compost_set_assert_func(void(*assert_func)(uint32_t line))
 source_parts.append(SourcePart(True,'''
 struct CompostSlice${struct_suffix} compost_slice_${fn_suffix}_init(void *ptr, uint16_t len)
 {
-    return (struct CompostSlice${struct_suffix}){ .ptr = ptr, .len = len };
+    return (struct CompostSlice${struct_suffix}){.ptr = ptr, .len = len};
 }
 
 struct CompostSlice${struct_suffix} compost_slice_${fn_suffix}_new(struct CompostAlloc *alloc, uint16_t len)
@@ -493,14 +488,14 @@ struct CompostSlice${struct_suffix} compost_slice_${fn_suffix}_new(struct Compos
     if (ptr == NULL) {
         len = 0;
     }
-    return (struct CompostSlice${struct_suffix}){ .ptr = ptr, .len = len};
+    return (struct CompostSlice${struct_suffix}){.ptr = ptr, .len = len};
 }
 
 ${type} compost_slice_${fn_suffix}_get(struct CompostSlice${struct_suffix} target, uint16_t idx)
 {
     COMPOST_ASSERT(idx < target.len);
     COMPOST_ASSERT(target.ptr != NULL);
-    const uint8_t* ptr = target.ptr + (sizeof(${type}) * idx);
+    const uint8_t *ptr = target.ptr + (sizeof(${type}) * idx);
     return compost_${fn_suffix}_load(&ptr);
 }
 
@@ -508,7 +503,7 @@ void compost_slice_${fn_suffix}_set(struct CompostSlice${struct_suffix} target, 
 {
     COMPOST_ASSERT(idx < target.len);
     COMPOST_ASSERT(target.ptr != NULL);
-    uint8_t* ptr = target.ptr + (sizeof(${type}) * idx);
+    uint8_t *ptr = target.ptr + (sizeof(${type}) * idx);
     compost_${fn_suffix}_store(&ptr, value);
 }
 
@@ -517,7 +512,7 @@ uint16_t compost_slice_${fn_suffix}_copy_from(struct CompostSlice${struct_suffix
     COMPOST_ASSERT(dest.ptr != NULL);
     COMPOST_ASSERT(src != NULL);
     int len_limit = len <= dest.len ? len : dest.len;
-    if ((uint8_t*)src != dest.ptr) {
+    if ((uint8_t *)src != dest.ptr) {
         for (int i = 0; i < len_limit; i++) {
             compost_slice_${fn_suffix}_set(dest, i, src[i]);
         }
@@ -537,7 +532,7 @@ uint16_t compost_slice_${fn_suffix}_ncopy_to(struct CompostSlice${struct_suffix}
     COMPOST_ASSERT(src.ptr != NULL);
     COMPOST_ASSERT(dest != NULL);
     int len_limit = len <= src.len ? len : src.len;
-    if (src.ptr != (uint8_t*)dest) {
+    if (src.ptr != (uint8_t *)dest) {
         for (int i = 0; i < len_limit; i++) {
             dest[i] = compost_slice_${fn_suffix}_get(src, i);
         }
@@ -563,10 +558,10 @@ source_parts.append(SourcePart(False,'''
 struct CompostAlloc compost_alloc_init(uint8_t *buffer, uint16_t len)
 {
     return (struct CompostAlloc){.suffixes = NULL,
-                                  .suffixes_len = 0,
-                                  .alloc_ctr = 0,
-                                  .ptr = buffer,
-                                  .buffer = compost_slice_u8_init(buffer, len)};
+                                 .suffixes_len = 0,
+                                 .alloc_ctr = 0,
+                                 .ptr = buffer,
+                                 .buffer = compost_slice_u8_init(buffer, len)};
 }
 
 void compost_alloc_set_suffixes(struct CompostAlloc *alloc, uint16_t *suffixes, uint16_t len)
@@ -590,7 +585,8 @@ void *compost_alloc_next(struct CompostAlloc *alloc, uint16_t len)
 {
     COMPOST_ASSERT(alloc != NULL);
     int capacity = alloc->buffer.len - (alloc->ptr - alloc->buffer.ptr);
-    if ((int)len > capacity || (alloc->suffixes != NULL && alloc->alloc_ctr >= alloc->suffixes_len)) {
+    if ((int)len > capacity ||
+        (alloc->suffixes != NULL && alloc->alloc_ctr >= alloc->suffixes_len)) {
         return NULL;
     }
 
@@ -624,7 +620,7 @@ void compost_str_copy(struct CompostSliceU8 dest, const char *src)
     compost_slice_copy_from(dest, (void *)src, len);
     if (len < dest.len) {
         for (int i = len; i < dest.len; i++) {
-            compost_slice_set(dest, i, '\\0');
+            compost_slice_set(dest, i, '\0');
         }
     }
 }

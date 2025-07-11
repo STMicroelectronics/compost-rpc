@@ -14,11 +14,11 @@ header_template_head = '''#ifndef ${filename_caps}_H
 
 ${version_info}
 
-#define COMPOST_ERR             -1  ///< Generic error
-#define COMPOST_EINVAL          -22 ///< Invalid argument
-#define COMPOST_EMSGSIZE        -90 ///< Message too long
-#define COMPOST_EFLAGS          -91 ///< Reserved flags set
-#define COMPOST_ETXN            -92 ///< Unexcepted transaction value
+#define COMPOST_ERR      -1  ///< Generic error
+#define COMPOST_EINVAL   -22 ///< Invalid argument
+#define COMPOST_EMSGSIZE -90 ///< Message too long
+#define COMPOST_EFLAGS   -91 ///< Reserved flags set
+#define COMPOST_ETXN     -92 ///< Unexcepted transaction value
 
 struct CompostMsg {
     uint16_t len;
@@ -32,11 +32,9 @@ struct CompostMsg {
 // forward declare compost_alloc to allow usage in compost_slice_xx_new function
 struct CompostAlloc;
 
-
 /******************************************************************************/
 /*                            S L I C E S                                     */
 /******************************************************************************/
-
 '''
 
 slice_template = '''
@@ -300,10 +298,8 @@ void compost_str_copy(struct CompostSliceU8 dest, const char *src);
  *
  * @param assert_func Function pointer to the custom assert function or NULL to reset to default
  */
-void compost_set_assert_func(void(*assert_func)(uint32_t));
-
+void compost_set_assert_func(void (*assert_func)(uint32_t));
 ${protocol}
-
 #endif /* COMPOST_H */
 '''
 

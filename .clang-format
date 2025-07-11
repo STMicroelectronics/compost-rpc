@@ -16,7 +16,7 @@ AllowShortLoopsOnASingleLine: false
 AllowShortEnumsOnASingleLine: false
 IncludeBlocks: Preserve
 SortIncludes: Never
-AlignConsecutiveMacros: AcrossEmptyLinesAndComments
+AlignConsecutiveMacros: AcrossComments
 AlignOperands: Align
 AlignAfterOpenBracket: Align
 AlignEscapedNewlines: Left

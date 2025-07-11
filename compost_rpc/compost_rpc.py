@@ -1230,8 +1230,7 @@ class CodeGenerator(ABC):
     _GENERATION_NOTE: str = """
 /******************************************************************************/
 /*                     G E N E R A T E D   P R O T O C O L                    */
-/******************************************************************************/
-"""
+/******************************************************************************/"""
 
     def __init__(self, protocol: type[Protocol]):
         """Constructor for the interface"""
@@ -1489,7 +1488,7 @@ struct {t.__name__} {t.__name__}_init({', '.join(init_fn_args) if init_fn_args e
             is_store = helper == "store"
             fn = self._serdes_fn(t, helper)
             # load
-            fn_proto = f"{self._type(t)} {fn}(const uint8_t** src)"
+            fn_proto = f"{self._type(t)} {fn}(const uint8_t ** src)"
             fn_call = self._load_call
             iter_ptr = "src"
             if is_store: #store
@@ -1634,8 +1633,8 @@ enum RpcId {{
             params = ", " + ", ".join(params) if params else ""
             protocol_header += f"""
 /**
-* {notif.__doc__}
-*/
+ * {notif.__doc__}
+ */
 int16_t {notif.name}_store(uint8_t *tx_buf, size_t tx_buf_size{params});
 """
             protocol_source += f"""/**
@@ -1647,7 +1646,7 @@ int16_t {notif.name}_store(uint8_t *tx_buf, size_t tx_buf_size{params})
         .txn   = 0,
         .payload_buf = tx_buf + PAYLOAD_OFFSET
     }};
-    uint8_t* dest = tx.payload_buf;
+    uint8_t *dest = tx.payload_buf;
 """
             protocol_source.indent_inc()
             for param_name, param_type in notif.get_param_items():
@@ -1674,21 +1673,21 @@ int16_t {notif.name}_store(uint8_t *tx_buf, size_t tx_buf_size{params})
             invoke_prototype = _String()
             invoke_prototype += f"""
 /**
-* {rpc.__doc__}
-*/
+ * {rpc.__doc__}
+ */
 {self._handler_signature(rpc)}
 """
             invoke_fn = _String()
             invoke_fn += f"""
 /**
-* {doc_prefix} function for {rpc.name} function
-*/
+ * {doc_prefix} function for {rpc.name} function
+ */
 void invoke_{rpc.name}({", ".join(invoke_params)})
 {{
 """
             invoke_fn.indent_inc()
             if parameters_items:
-                invoke_fn.add("const uint8_t* src = rx.payload_buf;")
+                invoke_fn.add("const uint8_t *src = rx.payload_buf;")
             for name, t in parameters_items:
                 invoke_fn.add(self._load_call(t.annotation, dest = f"l_{name}", src = "&src"))
             if get_origin(sig.return_annotation) is list or _issubclass(sig.return_annotation, (bytes, str)):
@@ -1702,7 +1701,7 @@ void invoke_{rpc.name}({", ".join(invoke_params)})
                     ))
             invoke_fn.add(f"{self._handler_signature(rpc, as_caller=True)}")
             if sig.return_annotation is not Signature.empty:
-                invoke_fn.add('uint8_t* dest = tx->payload_buf;')
+                invoke_fn.add('uint8_t *dest = tx->payload_buf;')
                 invoke_fn.add(self._store_call(sig.return_annotation, "ret"))
             if sig.return_annotation is Signature.empty:
                 invoke_fn.add("tx->len = 0;")
