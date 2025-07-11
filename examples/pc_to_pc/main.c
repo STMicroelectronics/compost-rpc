@@ -34,8 +34,8 @@ int main(int argc, char *argv[])
     sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     sockaddr.sin_port = htons(3333);
     int sock = socket(AF_INET, SOCK_STREAM, 0);
-    int optval = 1;
-    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    const int optval = 1;
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&optval, sizeof(optval));
     bind(sock, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
     listen(sock, 5);
 
