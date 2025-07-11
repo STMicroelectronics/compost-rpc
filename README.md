@@ -72,3 +72,26 @@ Simplified functionality diagram:
 - C like Struct
 - C like Enum with selectable underlying type
 - Dynamically sized array (list) for each supported primitive type
+
+## Try it!
+
+You just need Python and a C compiler like GCC to run our single PC example.
+
+    git clone https://github.com/STMicroelectronics/compost-rpc.git
+    cd compost-rpc/examples/pc_to_pc
+    python protocol_def.py
+    gcc -o server main.c compost.c
+
+In one terminal run the C server:
+
+    ./server
+
+In another terminal run the Python client:
+
+    python main.py
+
+Client sends two integers and the server adds them together and sends the result back to the client.
+It's probably the simplest Compost example you can have.
+
+If you want to try Compost-RPC properly with an MCU, check out
+the [Tutorial](https://github.com/STMicroelectronics/compost-rpc/wiki/Tutorial).
