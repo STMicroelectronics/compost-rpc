@@ -620,7 +620,7 @@ void compost_str_copy(struct CompostSliceU8 dest, const char *src)
     compost_slice_copy_from(dest, (void *)src, len);
     if (len < dest.len) {
         for (int i = len; i < dest.len; i++) {
-            compost_slice_set(dest, i, '\0');
+            compost_slice_set(dest, i, 0);
         }
     }
 }
