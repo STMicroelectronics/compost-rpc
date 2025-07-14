@@ -2104,7 +2104,7 @@ class Generator:
 
 
 def main():
-    print(f"Compost {__version__}\n")
+    print(f"compost_rpc {__version__}\n")
     print(cf.info("Checking optional dependencies:"))
     try:
         import serial
