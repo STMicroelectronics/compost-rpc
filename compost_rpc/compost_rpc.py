@@ -825,8 +825,8 @@ def enum(cls: _C) -> _C:
 
     if not _issubclass(cls, Enum):
         raise TypeError("compost_enum supports only Enum types")
-    if not _issubclass(cls, (I8, U8, BitU)):
-        raise TypeError("compost_enum supports only I8, U8 or BitInt data type for Enums")
+    if not _issubclass(cls, (I8, U8, I16, BitU)):
+        raise TypeError("compost_enum supports only I8, U8, I16 or BitInt data type for Enums")
 
     def __deepcopy__(self,memo):
         return self
