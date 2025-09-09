@@ -2,7 +2,6 @@
 /******************************************************************************/
 /*                     G E N E R A T E D   P R O T O C O L                    */
 /******************************************************************************/
-
 using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;

@@ -26,9 +26,9 @@ class MotorState(I8, Enum):
     STOP = 3
 
 @enum
-class MotorDirection(I8, Enum):
-    DOWN = 0
-    UP = 1
+class MotorDirection(I16, Enum):
+    DOWN = -1000
+    UP = 1000
 
 @enum
 class Voltages(BitU[4], Enum):

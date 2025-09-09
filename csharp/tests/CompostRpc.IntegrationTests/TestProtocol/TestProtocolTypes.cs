@@ -2,7 +2,6 @@
 /******************************************************************************/
 /*                     G E N E R A T E D   P R O T O C O L                    */
 /******************************************************************************/
-
 using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -18,7 +17,7 @@ public enum Status : byte
     Fail = 255
 };
 
-public enum MotorState : byte
+public enum MotorState : sbyte
 {
     Off = 0,
     On = 1,
@@ -26,13 +25,13 @@ public enum MotorState : byte
     Stop = 3
 };
 
-public enum MotorDirection : byte
+public enum MotorDirection : short
 {
-    Down = 0,
-    Up = 1
+    Down = -1000,
+    Up = 1000
 };
 
-public enum Voltages : byte
+public enum Voltages : int
 {
     Mv110_92 = 0,
     Mv98_76 = 1,
