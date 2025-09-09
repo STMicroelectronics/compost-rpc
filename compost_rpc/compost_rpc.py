@@ -564,6 +564,11 @@ def unpack_payload(types: list[type], payload: bytes) -> tuple:
             elif _issubclass(t, U8):
                 ret.append(t(*unpack_from(U8.fmt, payload, offset.bytes)))
                 offset += U8.size
+            elif _issubclass(t, I16):
+                ret.append(t(*unpack_from(I16.fmt, payload, offset.bytes)))
+                offset += I16.size
+            else:
+                TypeError("Unsupported enum backing type")
         elif _issubclass(t, BitU):
             val, offset = t.unpack(memoryview(payload), offset)
             ret.append(val)
