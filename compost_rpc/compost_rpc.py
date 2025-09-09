@@ -1870,7 +1870,7 @@ class CSharpCodeGenerator(CodeGenerator):
             elif _issubclass(t, Enum):
                 sep = ",\n"
                 cs_types += f"""
-public enum {t.__name__} : byte\n{{
+public enum {t.__name__} : {self._type(t.backing_type)}\n{{
 {sep.join(f"    {_pcase(variant.name)} = {variant.value}" for variant in t)}
 }};
 """
