@@ -1,6 +1,6 @@
 [project]
 name = "compost_rpc"
-version = "0.6.0.dev"
+version = "0.7.0.dev"
 description = "Compost RPC protocol generator"
 authors = [
   { name = "Radovan Blažek", email = "radovan.blazek@st.com" },
