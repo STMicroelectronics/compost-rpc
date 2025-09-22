@@ -16,13 +16,6 @@ source_parts.append(SourcePart(False,'''/** @file
 #include <stdint.h>
 #include <string.h>
 
-#ifndef COMPOST_ALLOW_SMALL_INT
-#if INT_MAX < 2147483647
-#error \\
-    "int is smaller than 32b - Compost expects Enums to have 32b. You can allow smaller int by defining macro COMPOST_ALLOW_SMALL_INT"
-#endif
-#endif
-
 #ifdef COMPOST_DEBUG
 #define COMPOST_ASSERT(expr)                   \\
     do {                                       \\
