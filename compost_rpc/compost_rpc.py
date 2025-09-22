@@ -1752,14 +1752,14 @@ void compost_invoke_switch(struct CompostMsg *tx, const struct CompostMsg rx)
                 from .lib.c import header_template
                 from .lib.c import source_template
             header = Template(header_template.content).substitute(
-                                       uuid_hi="0x" + gen_uuid.hex.upper()[:16],
-                                       uuid_lo="0x" + gen_uuid.hex.upper()[16:],
+                                       uuid_hi=f"0x{gen_uuid.hex.upper()[:16]}ull",
+                                       uuid_lo=f"0x{gen_uuid.hex.upper()[16:]}ull",
                                        version_info=version_info,
                                        filename_caps=self.filename.upper(),
                                        protocol=protocol_header)
             source = Template(source_template.content).substitute(
-                                        uuid_hi="0x" + gen_uuid.hex.upper()[:16],
-                                        uuid_lo="0x" + gen_uuid.hex.upper()[16:],
+                                        uuid_hi=f"0x{gen_uuid.hex.upper()[:16]}ull",
+                                        uuid_lo=f"0x{gen_uuid.hex.upper()[16:]}ull",
                                         filename=self.filename,
                                         serdes="".join(self._type_serdes.values()))
             source += f"{protocol_source}"
