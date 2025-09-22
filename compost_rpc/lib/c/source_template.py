@@ -16,6 +16,10 @@ source_parts.append(SourcePart(False,'''/** @file
 #include <stdint.h>
 #include <string.h>
 
+#if COMPOST_UUID_HI != ${uuid_hi} || COMPOST_UUID_LO != ${uuid_lo}
+#error "Mismatched compost.c and compost.h. Make sure the files are from the same generation."
+#endif
+
 #ifdef COMPOST_DEBUG
 #define COMPOST_ASSERT(expr)                   \\
     do {                                       \\

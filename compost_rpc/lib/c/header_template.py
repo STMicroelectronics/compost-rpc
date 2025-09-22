@@ -13,6 +13,8 @@ header_template_head = '''#ifndef ${filename_caps}_H
 #include <string.h>
 
 ${version_info}
+#define COMPOST_UUID_HI ${uuid_hi}
+#define COMPOST_UUID_LO ${uuid_lo}
 
 #define COMPOST_ERR      -1  ///< Generic error
 #define COMPOST_EINVAL   -22 ///< Invalid argument

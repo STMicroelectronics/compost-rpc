@@ -8,6 +8,7 @@ import subprocess
 import logging
 import threading
 import typing
+import uuid
 import socket
 from string import Template
 from dataclasses import dataclass, astuple
@@ -1602,6 +1603,7 @@ enum {t.__name__} {{
     def generate(self, endpoint: Endpoint = Endpoint.REMOTE) -> list[tuple[Path, str]]:
         self._validate_endpoint(endpoint)
         self._define_types()
+        gen_uuid = uuid.uuid4()
         version_info = f'''#define COMPOST_VERSION "{__version__}"
 #define COMPOST_GENTIME "{datetime.now().isoformat(timespec="seconds")}"'''
 
@@ -1749,8 +1751,17 @@ void compost_invoke_switch(struct CompostMsg *tx, const struct CompostMsg rx)
             else:
                 from .lib.c import header_template
                 from .lib.c import source_template
-            header = Template(header_template.content).substitute(version_info=version_info, filename_caps=self.filename.upper(), protocol=protocol_header)
-            source = Template(source_template.content).substitute(filename=self.filename, serdes="".join(self._type_serdes.values()))
+            header = Template(header_template.content).substitute(
+                                       uuid_hi="0x" + gen_uuid.hex.upper()[:16],
+                                       uuid_lo="0x" + gen_uuid.hex.upper()[16:],
+                                       version_info=version_info,
+                                       filename_caps=self.filename.upper(),
+                                       protocol=protocol_header)
+            source = Template(source_template.content).substitute(
+                                        uuid_hi="0x" + gen_uuid.hex.upper()[:16],
+                                        uuid_lo="0x" + gen_uuid.hex.upper()[16:],
+                                        filename=self.filename,
+                                        serdes="".join(self._type_serdes.values()))
             source += f"{protocol_source}"
             header_path = Path(self.path_header) / f"{self.filename}.h"
             source_path = Path(self.path_source) / f"{self.filename}.c"
