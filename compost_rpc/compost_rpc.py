@@ -216,20 +216,6 @@ class MemUnit:
         return MemUnit(self.bits + other.bits)
 
 
-class CompostSlice(bytes):
-    """Represents dynamically sized array of U8"""
-
-    size = MemUnit()
-    fmt = ""
-
-
-class CompostString(str):
-    """String based on the compost_slice_u8"""
-
-    size = MemUnit()
-    fmt = ""
-
-
 class U64(int):
     """64-bit unsigned integer"""
 
