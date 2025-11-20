@@ -166,6 +166,12 @@ class UnexpectedTxnError(RpcError):
     pass
 
 
+class MalformedMessageError(RpcError):
+    """Received malformed message."""
+
+    pass
+
+
 class MemUnit:
     """Represents a memory size that can be specified in bits or bytes. Now immutable."""
 
@@ -1101,7 +1107,7 @@ class _Session:
         self.rpcs = rpcs
         self.timeout = timeout
         self.last_txn = 1
-        self.q: Queue[Msg] = Queue(0)  # Maybe define some size?
+        self.q: Queue[Msg | Exception] = Queue(0)  # Maybe define some size?
         self.listener = threading.Thread(target=self.receiver, name="Listener_thread")
         self.listener.daemon = True
         self.listener.start()
@@ -1115,13 +1121,20 @@ class _Session:
 
     def receiver(self):
         while True:
-            msg_bytes = self.transport.receive()
+            try:
+                msg_bytes = self.transport.receive()
+            except Exception as e:
+                logger.error(f"Transport receive error: {e}")
+                self.q.put(e)
+                continue
             if len(msg_bytes) < 4:
                 logger.error("Malformed message: Length < 4")
+                self.q.put(MalformedMessageError("Received message length < 4 bytes"))
                 continue
             msg = Msg.unpack(msg_bytes)
             logger.debug(f"<- {msg}")
             if msg.header.rpc_id not in self.rpcs:
+                self.q.put(UnknownRpcIdError())
                 logger.error(f"Received unknown rpc_id {hex(msg.header.rpc_id)}")
                 continue
             if msg.header.txn == 0:
@@ -1137,10 +1150,16 @@ class _Session:
         self.transport.send(msg.pack())
 
     def recv_response(self, txn: int) -> Msg:
+        if not self.listener.is_alive():
+            raise RuntimeError("Transport error. Listener thread not running.")
         try:
-            msg = self.q.get(timeout=self.timeout)
+            item = self.q.get(timeout=self.timeout)
         except(Empty):
             raise RequestTimeoutError("Response not received in time.")
+        if isinstance(item, Exception):
+            raise item
+        else:
+            msg = item
         if msg.header.rpc_id not in self.rpcs:
             logger.error(f"Received unknown rpc_id {hex(msg.header.rpc_id)}")
             raise UnknownRpcIdError()
