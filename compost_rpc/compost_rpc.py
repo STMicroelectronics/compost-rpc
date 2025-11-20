@@ -977,7 +977,7 @@ class SerialTransport(Transport):
             import serial
         except ImportError:
             raise ImportError("Package pyserial not found. Install pyserial to use the serial transport with Compost.")
-        self.port = serial.Serial(serial_port, baudrate)
+        self.port = serial.Serial(serial_port, baudrate, write_timeout=1)
 
     def send(self, msg: bytes):
         sent = 0
