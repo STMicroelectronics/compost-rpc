@@ -249,8 +249,6 @@ int16_t compost_msg_process(uint8_t *, const uint16_t, uint8_t *const, const uin
  * @brief Initializes an allocator.
  * @param buffer Pointer to buffer used for allocation
  * @param len Length of the buffer
- * @param alloc_sizes Pointer to array used for storing allocated sizes
- * @param alloc_ptrs Pointer to array used for storing pointers to allocations
  */
 struct CompostAlloc compost_alloc_init(uint8_t *buffer, uint16_t len);
 
