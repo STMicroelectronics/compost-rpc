@@ -87,20 +87,20 @@ int main(int argc, char *argv[])
         for (;;) {
 
             // Read the header (first 4 bytes)
-            if (read_bytes(connection, rx_buf, HEADER_SIZE) < 1)
+            if (read_bytes(connection, rx_buf, COMPOST_HEADER_LEN) < 1)
                 break;
 
             // Calculate the size of the payload
             // (first byte of the header indicates the number of 32-bit words of the payload)
-            size_t rx_payload_size = 4 * rx_buf[0];
+            size_t rx_payload_size = COMPOST_PAYLOAD_LEN(rx_buf);
 
             // Read the payload
-            if (read_bytes(connection, rx_buf + HEADER_SIZE, rx_payload_size) < 1)
+            if (read_bytes(connection, rx_buf + COMPOST_HEADER_LEN, rx_payload_size) < 1)
                 break;
 
             // Process the request and prepare the response
             int16_t tx_msg_size =
-                compost_msg_process(tx_buf, sizeof(tx_buf), rx_buf, HEADER_SIZE + rx_payload_size);
+                compost_msg_process(tx_buf, sizeof(tx_buf), rx_buf, COMPOST_MSG_LEN(rx_buf));
 
             // If the message size is negative, it indicates an error
             if (tx_msg_size > 0) {

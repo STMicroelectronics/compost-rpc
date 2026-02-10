@@ -92,17 +92,18 @@ int main(int argc, char *argv[])
     compost_set_assert_func(compost_assert);
 
     for (;;) {
-        if (fread(rx_buf, 1, 4, stdin) != 4) {
+        if (fread(rx_buf, 1, COMPOST_HEADER_LEN, stdin) != 4) {
             break;
         }
-        uint16_t data_len8 = rx_buf[0] * 4;
-        if (data_len8 > 0) {
-            if (fread(rx_buf + 4, 1, data_len8, stdin) != data_len8) {
+        size_t payload_len = COMPOST_PAYLOAD_LEN(rx_buf);
+        if (payload_len > 0) {
+            if (fread(rx_buf + COMPOST_HEADER_LEN, 1, payload_len, stdin) != payload_len) {
                 break;
             }
         }
-        log_msg("  mock <- ", rx_buf, 4 + data_len8);
-        int16_t tx_len = compost_msg_process(tx_buf, sizeof(tx_buf), rx_buf, 4 + data_len8);
+        size_t msg_len = COMPOST_MSG_LEN(rx_buf);
+        log_msg("  mock <- ", rx_buf, msg_len);
+        int16_t tx_len = compost_msg_process(tx_buf, sizeof(tx_buf), rx_buf, msg_len);
         log_msg("  mock -> ", tx_buf, tx_len);
 
         if (tx_len) {

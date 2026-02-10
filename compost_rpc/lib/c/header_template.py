@@ -22,6 +22,21 @@ ${version_info}
 #define COMPOST_EFLAGS   -91 ///< Reserved flags set
 #define COMPOST_ETXN     -92 ///< Unexcepted transaction value
 
+/// Length of the message header in bytes
+#define COMPOST_HEADER_LEN 4
+
+/**
+ * @brief Calculates the length of the entire message in bytes from the first byte of the header
+ * @param msg Pointer to the message
+ */
+#define COMPOST_MSG_LEN(msg) (4 + (4 * (((uint8_t *)msg)[0])))
+
+/**
+ * @brief Calculates the length of the payload in bytes from the first byte of the header
+ * @param msg Pointer to the message
+ */
+#define COMPOST_PAYLOAD_LEN(msg) (4 * (((uint8_t *)msg)[0]))
+
 struct CompostMsg {
     uint16_t len;
     uint16_t rpc_id;
