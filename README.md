@@ -62,6 +62,7 @@ Simplified functionality diagram:
 - Raw ethernet transport (Linux only)
 - TCP transport
 - Stdio transport
+- CAN FD using SocketCAN (Linux only)
 - Custom
 
 ### Data types
