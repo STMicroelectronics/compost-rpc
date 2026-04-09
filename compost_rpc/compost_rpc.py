@@ -1098,6 +1098,40 @@ class StdioTransport(Transport):
         return header + data
 
 
+class SocketCanFdTransport(Transport):
+    """Linux SocketCAN transport for CAN FD. Supports max 64-byte messages.
+    Sends the Compost frame as payload."""
+
+    CAN_FD_HEADER = Struct("@IBB2x") # SocketCAN CAN FD frame header
+    CAN_MTU = 16 # Classical CAN frame
+    CANFD_MTU = 72 # CAN FD frame
+
+    def __init__(self, interface: str, can_id_rx: int, can_id_tx: int) -> None:
+        self.socket = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW)
+        self.socket.setsockopt(socket.SOL_CAN_RAW, socket.CAN_RAW_FD_FRAMES, 1)
+        self.socket.bind((interface, ))
+        self.can_id_rx = can_id_rx
+        self.can_id_tx = can_id_tx
+
+    def send(self, msg: bytes):
+        length = 4 + 4 * msg[0]
+        if length > 64:
+            raise ValueError("Message length exceeds 64 bytes")
+        can_frame = (self.CAN_FD_HEADER.pack(self.can_id_tx, length, 0) + msg).ljust(self.CANFD_MTU, b"\x00")
+        self.socket.send(can_frame)
+
+    def receive(self) -> bytes:
+        while True:
+            cf, ancillary_data, msg_flags, addr = self.socket.recvmsg(self.CANFD_MTU)
+            if len(cf) != self.CANFD_MTU:
+                continue # Ignore non-FD frames
+            can_id, length, flags = self.CAN_FD_HEADER.unpack(cf[0:8])
+            if can_id != self.can_id_rx:
+                continue # Ignore frames with wrong CAN ID
+            assert length <= 64
+            return cf[8:8 + length]
+
+
 class _Session:
 
     _TXN_MAX = 255
