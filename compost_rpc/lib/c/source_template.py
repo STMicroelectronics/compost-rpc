@@ -38,7 +38,7 @@ source_parts.append(SourcePart(False,'''/** @file
     } while (0)
 #endif
 
-#define LEN_OFFSET                0
+#define WLEN_OFFSET               0
 #define TXN_OFFSET                1
 #define RPC_ID_HI_AND_RESP_OFFSET 2
 #define RPC_ID_LO_OFFSET          3
@@ -401,66 +401,78 @@ static inline uint32_t compost_u64_field_get(uint64_t backing, uint32_t offset_b
 /*            P U B L I C   A P I   F U N C T I O N S                         */
 /******************************************************************************/
 
-int16_t compost_header_set(uint8_t *tx_buf, uint16_t tx_buf_size, const struct CompostMsg tx)
+int compost_header_load(uint8_t *buf, struct CompostHeader *header)
 {
-    if (tx_buf == NULL ) {
-        return COMPOST_EINVAL;
-    }
-    if (tx_buf_size < 4) {
-        return COMPOST_EMSGSIZE;
-    }
-    COMPOST_ASSERT(tx.rpc_id <= 0x0FFF);
-    tx_buf[LEN_OFFSET] = tx.len;
-    tx_buf[TXN_OFFSET] = tx.txn;
-    tx_buf[RPC_ID_HI_AND_RESP_OFFSET] = tx.rpc_id >> 8;
-    if (tx.resp) {
-        tx_buf[RPC_ID_HI_AND_RESP_OFFSET] |= RESP_MASK;
-    }
-    tx_buf[RPC_ID_LO_OFFSET] = tx.rpc_id;
-    if (tx.len > 255) {
-        return COMPOST_EMSGSIZE;
-    }
-    int16_t msg_size = (tx.len * 4) + 4;
-    if (msg_size > tx_buf_size) {
-        return COMPOST_EMSGSIZE;
-    }
-    return msg_size;
-}
-
-int16_t compost_msg_process(uint8_t *tx_buf, const uint16_t tx_buf_size, uint8_t *const rx_buf,
-                            const uint16_t rx_buf_size)
-{
-    if ((rx_buf_size < 4) || (tx_buf_size < 4) || tx_buf == NULL || rx_buf == NULL) {
+    if (buf == NULL || header == NULL) {
         return COMPOST_EINVAL;
     }
 
-    uint8_t rpc_id_hi = rx_buf[RPC_ID_HI_AND_RESP_OFFSET] & RPC_ID_HI_MASK;
-    uint8_t flags = rx_buf[RPC_ID_HI_AND_RESP_OFFSET] & FLAGS_MASK;
+    uint8_t rpc_id_hi = buf[RPC_ID_HI_AND_RESP_OFFSET] & RPC_ID_HI_MASK;
+    uint8_t flags = buf[RPC_ID_HI_AND_RESP_OFFSET] & FLAGS_MASK;
 
     if (flags & ~RESP_MASK) {
         return COMPOST_EFLAGS;
     }
 
-    const struct CompostMsg rx = {.len = rx_buf[LEN_OFFSET],
-                                   .txn = rx_buf[TXN_OFFSET],
-                                   .resp = (flags & RESP_MASK) != 0,
-                                   .rpc_id = ((uint16_t)rpc_id_hi << 8) | rx_buf[RPC_ID_LO_OFFSET],
+    header->wlen = buf[WLEN_OFFSET];
+    header->txn = buf[TXN_OFFSET];
+    header->resp = flags & RESP_MASK;
+    header->rpc_id = ((uint16_t)rpc_id_hi << 8) | buf[RPC_ID_LO_OFFSET];
+    return 0;
+}
+
+int compost_header_store(uint8_t *buf, const struct CompostHeader header)
+{
+    if (buf == NULL) {
+        return COMPOST_EINVAL;
+    }
+    COMPOST_ASSERT(header.rpc_id <= 0x0FFF);
+    buf[WLEN_OFFSET] = header.wlen;
+    buf[TXN_OFFSET] = header.txn;
+    buf[RPC_ID_HI_AND_RESP_OFFSET] = header.rpc_id >> 8;
+    if (header.resp) {
+        buf[RPC_ID_HI_AND_RESP_OFFSET] |= RESP_MASK;
+    }
+    buf[RPC_ID_LO_OFFSET] = header.rpc_id;
+    return 0;
+}
+
+int compost_msg_process(uint8_t *tx_buf, const size_t tx_buf_size, uint8_t *const rx_buf,
+                            const size_t rx_buf_size)
+{
+    if ((rx_buf_size < 4) || (tx_buf_size < 4) || tx_buf == NULL || rx_buf == NULL) {
+        return COMPOST_EINVAL;
+    }
+
+    struct CompostHeader rx_header;
+    int ret = compost_header_load(rx_buf, &rx_header);
+    if (ret) {
+        return ret;
+    }
+
+    const struct CompostMsg rx = { .header = rx_header,
                                    .payload_buf = rx_buf + PAYLOAD_OFFSET,
                                    .payload_buf_size = rx_buf_size - PAYLOAD_OFFSET};
 
-    struct CompostMsg tx = {.txn = rx.txn,
-                             .resp = true,
+    struct CompostMsg tx = { .header.txn = rx.header.txn,
+                             .header.resp = true,
+                             .header.wlen = 0,
+                             .header.rpc_id = 0,
                              .payload_buf_size = tx_buf_size - PAYLOAD_OFFSET,
                              .payload_buf = tx_buf + PAYLOAD_OFFSET};
 
-    if (rx.txn != 0 && rx.resp == true) {
+    if (rx.header.txn != 0 && rx.header.resp == true) {
         return COMPOST_ETXN; // We don't support sending RPC requests, so we can't get a response
     }
 
     compost_invoke_switch(&tx, rx);
 
-    if (tx.txn || tx.len) {
-        return compost_header_set(tx_buf, tx_buf_size, tx);
+    if (tx.header.txn || tx.header.wlen) {
+        ret = compost_header_store(tx_buf, tx.header);
+        if (ret) {
+            return ret;
+        }
+        return 4 + (tx.header.wlen * 4); // Total message length is header (4 bytes) + payload
     } else {
         return 0; // Nothing to send
     }

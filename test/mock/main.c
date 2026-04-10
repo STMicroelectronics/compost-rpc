@@ -120,13 +120,13 @@ int main(int argc, char *argv[])
         case 0x0e00:
             time(&current_epoch);
             struct MockDate date = epoch_to_date_handler(current_epoch, &alloc);
-            tx_len = notify_date_store(tx_buf, sizeof(tx_buf), date);
+            tx_len = notify_date_store(tx_buf, date);
             break;
         case 0x0e02:
-            tx_len = notify_heartbeat_store(tx_buf, sizeof(tx_buf));
+            tx_len = notify_heartbeat_store(tx_buf);
             break;
         case 0x0e03:
-            tx_len = notify_bitwise_complement_store(tx_buf, sizeof(tx_buf), 0xAAAAAAAAAAAAAAAA, 0x5555555555555555);
+            tx_len = notify_bitwise_complement_store(tx_buf, 0xAAAAAAAAAAAAAAAA, 0x5555555555555555);
             break;
         default:
             notif_requested = false;

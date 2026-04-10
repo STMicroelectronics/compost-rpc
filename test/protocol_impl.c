@@ -241,7 +241,7 @@ void notify_motor_control_handler(struct MockMotorControl control)
         compost_slice_set(report.voltage, i, i + 11);
         compost_slice_set(report.current, i, i + 41);
     }
-    int16_t tx_len = notify_motor_report_store(tx_buf_notif, sizeof(tx_buf_notif), report);
+    int16_t tx_len = notify_motor_report_store(tx_buf_notif, report);
     if (tx_len > 0) {
         fwrite(tx_buf_notif, 1, tx_len, stdout);
         fflush(stdout);
@@ -262,7 +262,7 @@ void notify_motor_report_handler(struct MockMotorReport report)
     control.state = MOTOR_STATE_STOP;
     control.direction = MOTOR_DIRECTION_DOWN;
     control.pwm_duty = 1200;
-    int16_t tx_len = notify_motor_control_store(tx_buf_notif, sizeof(tx_buf_notif), control);
+    int16_t tx_len = notify_motor_control_store(tx_buf_notif, control);
     if (tx_len > 0) {
         fwrite(tx_buf_notif, 1, tx_len, stdout);
         fflush(stdout);
@@ -290,7 +290,7 @@ void notify_bitfields_handler(struct BitfieldStruct config)
     config.ststart = ~config.ststart;
     config.temp = VOLTAGES_MV_37_50;
     config.tnom = ~config.tnom;
-    uint16_t tx_len = notify_bitfields_store(tx_buf_notif, sizeof(tx_buf_notif), config);
+    uint16_t tx_len = notify_bitfields_store(tx_buf_notif, config);
     fwrite(tx_buf_notif, 1, tx_len, stdout);
     fflush(stdout);
 }

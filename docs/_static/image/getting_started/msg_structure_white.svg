@@ -67,7 +67,7 @@
       </g>
       <g>
         <g>
-          <rect width="198" height="71" field="LEN" style="fill-opacity:0.1;fill:hsl(0,100%,50%)"/>
+          <rect width="198" height="71" field="WLEN" style="fill-opacity:0.1;fill:hsl(0,100%,50%)"/>
           <rect x="198" width="198" height="71" field="TXN" style="fill-opacity:0.1;fill:hsl(80,100%,50%)"/>
           <rect x="396" width="74" height="71" field="Reserved" style="fill-opacity:0.1;fill:hsl(45,100%,50%)"/>
           <rect x="470" width="25" height="71" field="RESP" style="fill-opacity:0.1;fill:hsl(170,100%,50%)"/>
@@ -77,7 +77,7 @@
         <g transform="translate(12,35)">
           <g transform="translate(87)">
             <text y="6">
-              <tspan>LEN</tspan>
+              <tspan>WLEN</tspan>
             </text>
           </g>
           <g transform="translate(284)">
@@ -188,7 +188,7 @@
         <g transform="translate(12,79)">
           <g transform="translate(383)">
             <text y="6">
-              <tspan>Variable length payload. Length is 4 * LEN bytes.</tspan>
+              <tspan>Variable length payload. Length is 4 * WLEN bytes.</tspan>
             </text>
           </g>
         </g>
