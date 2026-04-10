@@ -1681,15 +1681,15 @@ enum RpcId {{
 /**
  * {notif.__doc__}
  */
-int16_t {notif.name}_store(uint8_t *tx_buf, size_t tx_buf_size{params});
+int16_t {notif.name}_store(uint8_t *tx_buf{params});
 """
             protocol_source += f"""/**
 * Serialization function for {notif.name} notification
 */
-int16_t {notif.name}_store(uint8_t *tx_buf, size_t tx_buf_size{params})
+int16_t {notif.name}_store(uint8_t *tx_buf{params})
 {{
     struct CompostMsg tx = {{
-        .txn   = 0,
+        .header = {{ .txn = 0 }},
         .payload_buf = tx_buf + PAYLOAD_OFFSET
     }};
     uint8_t *dest = tx.payload_buf;
@@ -1698,9 +1698,11 @@ int16_t {notif.name}_store(uint8_t *tx_buf, size_t tx_buf_size{params})
             for param_name, param_type in notif.get_param_items():
                 protocol_source.add(self._store_call(param_type.annotation, param_name))
             protocol_source.indent_dec()
-            protocol_source += f"""    tx.rpc_id = {notif.name.upper()};
-    tx.len = compost_bytes_to_words(dest - tx.payload_buf);
-    return compost_header_set(tx_buf, tx_buf_size, tx);
+            protocol_source += f"""    tx.header.rpc_id = {notif.name.upper()};
+    size_t payload_len = dest - tx.payload_buf;
+    tx.header.wlen = compost_bytes_to_words(payload_len);
+    compost_header_store(tx_buf, tx.header);
+    return 4 + payload_len;
 }}
 
 """
@@ -1750,10 +1752,10 @@ void invoke_{rpc.name}({", ".join(invoke_params)})
                 invoke_fn.add('uint8_t *dest = tx->payload_buf;')
                 invoke_fn.add(self._store_call(sig.return_annotation, "ret"))
             if sig.return_annotation is Signature.empty:
-                invoke_fn.add("tx->len = 0;")
+                invoke_fn.add("tx->header.wlen = 0;")
             else:
-                invoke_fn.add("tx->len = compost_bytes_to_words(dest - tx->payload_buf);")
-            invoke_fn.add(f"tx->rpc_id = {rpc.name.upper()};")
+                invoke_fn.add("tx->header.wlen = compost_bytes_to_words(dest - tx->payload_buf);")
+            invoke_fn.add(f"tx->header.rpc_id = {rpc.name.upper()};")
             invoke_fn += "}\n"
 
             protocol_header += invoke_prototype
@@ -1763,13 +1765,13 @@ void invoke_{rpc.name}({", ".join(invoke_params)})
         rpc_id_fns = """
 void compost_unknown_msg(struct CompostMsg *tx)
 {
-    tx->rpc_id = UNKNOWN_MSG;
-    tx->len = 0;
+    tx->header.rpc_id = UNKNOWN_MSG;
+    tx->header.wlen = 0;
 }
 
 void compost_invoke_switch(struct CompostMsg *tx, const struct CompostMsg rx)
 {
-    switch (rx.rpc_id) {
+    switch (rx.header.rpc_id) {
 """
         for rpc in self._protocol._rpcs.values():
             if rpc.is_notification and not endpoint.is_call_inbound(rpc):

@@ -37,12 +37,16 @@ ${version_info}
  */
 #define COMPOST_PAYLOAD_LEN(msg) (4 * (((uint8_t *)msg)[0]))
 
+struct CompostHeader {
+    uint8_t wlen;    ///< Word length of the payload (payload length in bytes is wlen * 4)
+    uint8_t txn;     ///< Transaction identifier
+    uint16_t rpc_id; ///< RPC identifier
+    bool resp;       ///< Response flag
+};
+
 struct CompostMsg {
-    uint16_t len;
-    uint16_t rpc_id;
-    const uint16_t payload_buf_size;
-    uint8_t txn;
-    bool resp;
+    struct CompostHeader header;
+    const size_t payload_buf_size;
     uint8_t *payload_buf;
 };
 
@@ -258,7 +262,23 @@ struct CompostAlloc {
  * @return Size of valid data in bytes in the transmit buffer, or zero if there
  * is no message to send, or negative value if there was an error
  */
-int16_t compost_msg_process(uint8_t *, const uint16_t, uint8_t *const, const uint16_t);
+int compost_msg_process(uint8_t *tx_buf, const size_t tx_buf_size, uint8_t *const rx_buf, const size_t rx_buf_size);
+
+/**
+ * @brief Loads the message header from the buffer.
+ * @param buf Pointer to the buffer containing the header
+ * @param header Pointer to the CompostHeader struct where to store the header data
+ * @return Zero on success, or negative value if there was an error (e.g. invalid header)
+ */
+int compost_header_load(uint8_t *buf, struct CompostHeader *header);
+
+/**
+ * @brief Stores the message header to the buffer.
+ * @param buf Pointer to the buffer where to store the header
+ * @param header Pointer to the CompostHeader struct containing the header data
+ * @return Zero on success, or negative value if there was an error (e.g. insufficient buffer size)
+ */
+int compost_header_store(uint8_t *buf, const struct CompostHeader header);
 
 /**
  * @brief Initializes an allocator.
