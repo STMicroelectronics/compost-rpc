@@ -1681,12 +1681,12 @@ enum RpcId {{
 /**
  * {notif.__doc__}
  */
-int16_t {notif.name}_store(uint8_t *tx_buf{params});
+size_t {notif.name}_store(uint8_t *tx_buf{params});
 """
             protocol_source += f"""/**
 * Serialization function for {notif.name} notification
 */
-int16_t {notif.name}_store(uint8_t *tx_buf{params})
+size_t {notif.name}_store(uint8_t *tx_buf{params})
 {{
     struct CompostMsg tx = {{
         .header = {{ .txn = 0 }},
