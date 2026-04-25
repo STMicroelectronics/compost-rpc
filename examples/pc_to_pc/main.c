@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 
             // Process the request and prepare the response
             int16_t tx_msg_size =
-                compost_msg_process(tx_buf, sizeof(tx_buf), rx_buf, COMPOST_MSG_LEN(rx_buf));
+                compost_msg_process(tx_buf, sizeof(tx_buf), rx_buf, COMPOST_MSG_LEN(rx_buf), NULL);
 
             // If the message size is negative, it indicates an error
             if (tx_msg_size > 0) {
