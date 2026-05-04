@@ -67,16 +67,19 @@ uint16_t notif_request = 0xFFFF;
 
 void trigger_notification_handler(struct CompostCtx *ctx, uint16_t msg_id)
 {
+    (void)ctx;
     notif_request = msg_id;
 }
 
 uint32_t add_int_handler(struct CompostCtx *ctx, uint32_t a, uint32_t b)
 {
+    (void)ctx;
     return a + b;
 }
 
 uint32_t sum_list_handler(struct CompostCtx *ctx, struct CompostSliceU32 a)
 {
+    (void)ctx;
     int sum = 0;
     for (int i = 0; i < a.len; i++)
         sum += compost_slice_get(a, i);
@@ -85,16 +88,19 @@ uint32_t sum_list_handler(struct CompostCtx *ctx, struct CompostSliceU32 a)
 
 void void_return_handler(struct CompostCtx *ctx, int16_t x)
 {
+    (void)ctx;
     (void)x;
 }
 
 void void_full_handler(struct CompostCtx *ctx)
 {
+    (void)ctx;
     return;
 }
 
 float divide_float_handler(struct CompostCtx *ctx, float a, float b)
 {
+    (void)ctx;
     return a / b;
 }
 
@@ -221,11 +227,13 @@ uint8_t tx_buf_notif[1024];
 
 void notify_date_handler(struct CompostCtx *ctx, struct MockDate date)
 {
+    (void)ctx;  // Unused
     (void)date; // Unused
 }
 
 void notify_motor_control_handler(struct CompostCtx *ctx, struct MockMotorControl control)
 {
+    (void)ctx;
     assert(control.state == MOTOR_STATE_ON);
     assert(control.direction == MOTOR_DIRECTION_UP);
     assert(control.pwm_duty == 50);
@@ -250,6 +258,7 @@ void notify_motor_control_handler(struct CompostCtx *ctx, struct MockMotorContro
 
 void notify_motor_report_handler(struct CompostCtx *ctx, struct MockMotorReport report)
 {
+    (void)ctx;
     assert(report.state == MOTOR_STATE_START);
     assert(report.direction == MOTOR_DIRECTION_UP);
     assert(report.voltage.len == 20);
@@ -271,6 +280,7 @@ void notify_motor_report_handler(struct CompostCtx *ctx, struct MockMotorReport 
 
 void struct_in_param_handler(struct CompostCtx *ctx, struct ListFirstAttr structure)
 {
+    (void)ctx;
     assert(structure.data.len == 10);
     assert(structure.min == 1);
     assert(structure.max == 10);
@@ -278,6 +288,7 @@ void struct_in_param_handler(struct CompostCtx *ctx, struct ListFirstAttr struct
 
 void notify_bitfields_handler(struct CompostCtx *ctx, struct BitfieldStruct a, struct NestedBitfieldStruct b)
 {
+    (void)ctx;
     a.ccm = ~a.ccm;
     a.channel = ~a.channel;
     a.clear = ~a.clear;
@@ -289,11 +300,13 @@ void notify_bitfields_handler(struct CompostCtx *ctx, struct BitfieldStruct a, s
     a.temp = VOLTAGES_MV_37_50;
     a.tnom = ~a.tnom;
     uint16_t tx_len = notify_bitfields_store(tx_buf_notif, a, b);
+
     fwrite(tx_buf_notif, 1, tx_len, stdout);
     fflush(stdout);
 }
 
 void notify_log_handler(struct CompostCtx *ctx, struct MockLogMessage log)
 {
+    (void)ctx;
     (void)log;
 }
