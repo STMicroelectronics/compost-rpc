@@ -50,7 +50,7 @@ source_parts.append(SourcePart(False,'''/** @file
 
 static void (*compost_assert_func)(uint32_t line) = NULL;
 
-void compost_invoke_switch(struct CompostMsg *tx, const struct CompostMsg rx);
+void compost_invoke_switch(struct CompostCtx *ctx);
 
 
 /******************************************************************************/
@@ -438,7 +438,7 @@ int compost_header_store(uint8_t *buf, const struct CompostHeader header)
 }
 
 int compost_msg_process(uint8_t *tx_buf, const size_t tx_buf_size, uint8_t *const rx_buf,
-                            const size_t rx_buf_size)
+                            const size_t rx_buf_size, void *user_ctx)
 {
     if ((rx_buf_size < 4) || (tx_buf_size < 4) || tx_buf == NULL || rx_buf == NULL) {
         return COMPOST_EINVAL;
@@ -465,14 +465,15 @@ int compost_msg_process(uint8_t *tx_buf, const size_t tx_buf_size, uint8_t *cons
         return COMPOST_ETXN; // We don't support sending RPC requests, so we can't get a response
     }
 
-    compost_invoke_switch(&tx, rx);
+    struct CompostCtx ctx = { .rx = rx, .tx = tx, .alloc = {0}, .user_ctx = user_ctx };
+    compost_invoke_switch(&ctx);
 
-    if (tx.header.txn || tx.header.wlen) {
-        ret = compost_header_store(tx_buf, tx.header);
+    if (ctx.tx.header.txn || ctx.tx.header.wlen) {
+        ret = compost_header_store(tx_buf, ctx.tx.header);
         if (ret) {
             return ret;
         }
-        return 4 + (tx.header.wlen * 4); // Total message length is header (4 bytes) + payload
+        return 4 + (ctx.tx.header.wlen * 4); // Total message length is header (4 bytes) + payload
     } else {
         return 0; // Nothing to send
     }
