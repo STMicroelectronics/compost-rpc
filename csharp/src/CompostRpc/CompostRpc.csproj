@@ -36,15 +36,15 @@
 
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
     <PackageReference Include="System.Memory" Version="4.6.*" />
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.*" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.8" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.IO.Ports" Version="9.*" />
+    <PackageReference Include="System.IO.Ports" Version="10.0.8" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="GitVersion.MSBuild" Version="6.3.0">
+    <PackageReference Include="GitVersion.MSBuild" Version="6.7.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
