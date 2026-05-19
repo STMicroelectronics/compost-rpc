@@ -1,7 +1,7 @@
 """Main module of Compost
 """
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 
 import sys
 import subprocess
