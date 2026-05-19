@@ -1702,7 +1702,7 @@ size_t {notif.name}_store(uint8_t *tx_buf{params})
     size_t payload_len = dest - tx.payload_buf;
     tx.header.wlen = compost_bytes_to_words(payload_len);
     compost_header_store(tx_buf, tx.header);
-    return 4 + payload_len;
+    return COMPOST_MSG_LEN(tx_buf);
 }}
 
 """
