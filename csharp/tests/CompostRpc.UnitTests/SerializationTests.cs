@@ -22,6 +22,7 @@ public class SerializationTests
     {
         {-1, 0, 4, [0xF0,0,0,0]},
         {-8, 0, 4, [0x80,0,0,0]},
+        {(sbyte)-1, 0, 8, [0xFF,0,0,0]},
         {0xFU, 6, 4, [0x03,0xC0,0,0]},
         {0xFU, 1, 4, [0x78,0,0,0]},
         {0xFU, 0, 4, [0xF0,0,0,0]},
@@ -79,5 +80,47 @@ public class SerializationTests
         Assert.Equal(Status.Warn, value);
         offset = BufferUnit.Zero;
         Assert.ThrowsAny<OverflowException>(() => Serialization.SerializePackedPrimitive(Status.Fail, buffer, ref offset, size));
+    }
+
+    public static TheoryData<object> SignedPrimitiveSerializationTestData
+    {
+        get
+        {
+            var data = new TheoryData<object>
+            {
+                (object)(sbyte)-128,
+                (object)(sbyte)-1,
+                (object)(sbyte)0,
+                (object)(sbyte)127,
+                (object)short.MinValue,
+                (object)(short)-1,
+                (object)(short)0,
+                (object)short.MaxValue,
+                (object)int.MinValue,
+                (object)-1,
+                (object)0,
+                (object)int.MaxValue,
+                (object)long.MinValue,
+                (object)-1L,
+                (object)0L,
+                (object)long.MaxValue
+            };
+            return data;
+        }
+    }
+
+    [MemberData(nameof(SignedPrimitiveSerializationTestData))]
+    [Theory]
+    public void SignedPrimitiveSerializationTest(object value)
+    {
+        Type valueType = value.GetType();
+        byte[] buffer = new byte[Serialization.GetTypeSize(valueType).Bytes];
+        BufferUnit offset = BufferUnit.Zero;
+
+        Serialization.SerializePrimitive(value, buffer, ref offset);
+
+        offset = BufferUnit.Zero;
+        object actual = Serialization.DeserializePrimitive(valueType, buffer, ref offset);
+        Assert.Equal(value, actual);
     }
 }

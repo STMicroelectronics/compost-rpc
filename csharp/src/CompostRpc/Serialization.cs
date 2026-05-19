@@ -22,6 +22,7 @@ public static class Serialization
         = new()
     {
         {typeof(bool), (buf) => BitConverter.ToBoolean(buf, 0)},
+        {typeof(sbyte), (buf) => unchecked((sbyte)buf[0])},
         {typeof(short), (buf) => BitConverter.ToInt16(buf, 0)},
         {typeof(ushort), (buf) => BitConverter.ToUInt16(buf, 0)},
         {typeof(int), (buf) => BitConverter.ToInt32(buf, 0)},
@@ -282,6 +283,7 @@ public static class Serialization
         int next_offset = arg switch
         {
             bool argt => CopyBytes(BitConverter.GetBytes(argt), 0, buffer, offset.Bytes, 1),
+            sbyte argt => CopyBytes(unchecked((byte)argt), buffer, offset.Bytes),
             short argt => CopyBytes(BitConverter.GetBytes(argt), 0, buffer, offset.Bytes, sizeof(short)),
             ushort argt => CopyBytes(BitConverter.GetBytes(argt), 0, buffer, offset.Bytes, sizeof(ushort)),
             uint argt => CopyBytes(BitConverter.GetBytes(argt), 0, buffer, offset.Bytes, sizeof(uint)),
