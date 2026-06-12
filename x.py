@@ -43,15 +43,16 @@ targets: dict[str, Callable] = dict()
 
 def target(msg: str = None, dependencies: set[str] = frozenset()):
     def decorator(func):
-        def wrapper():
+        def wrapper(*args, **kwargs):
             if func.__name__ in already_run:
                 return
             for dep in dependencies:
                 dep()
             if msg:
                 print(f"\n>\t{msg}\n")
-            func()
+            result = func(*args, **kwargs)
             already_run.add(func.__name__)
+            return result
 
         targets[func.__name__] = wrapper
         return wrapper
@@ -71,6 +72,43 @@ def run(args: list[str], **kwargs):
         print(f"Command {e.filename} does not exist!")
         sys.exit(1)
 
+
+def replace_line(path: str, pattern: str, replacement: str):
+    with open(path, "r", encoding="utf-8") as file:
+        content = file.read()
+
+    new_content, replaced = re.subn(pattern, replacement, content, flags=re.MULTILINE)
+    if replaced != 1:
+        print(f"Expected to replace exactly one line in {path}, replaced {replaced} lines instead.")
+        sys.exit(1)
+
+    with open(path, "w", encoding="utf-8") as file:
+        file.write(new_content)
+
+
+def bump_version(version: str, bump_type: str) -> str:
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", version)
+    if not match:
+        print(f"Current version '{version}' is not in MAJOR.MINOR.PATCH format.")
+        sys.exit(1)
+
+    major, minor, patch = map(int, match.groups())
+
+    if bump_type == "major":
+        major += 1
+        minor = 0
+        patch = 0
+    elif bump_type == "minor":
+        minor += 1
+        patch = 0
+    elif bump_type == "patch":
+        patch += 1
+    else:
+        print(f"Unsupported bump type: {bump_type}")
+        sys.exit(1)
+
+    return f"{major}.{minor}.{patch}"
+
 @target("Generating version from Git")
 def version():
     ver = json.loads(run(["dotnet-gitversion"], capture_output=True, text=True).stdout)
@@ -79,13 +117,28 @@ def version():
     else:
         prerelease = ""
     python_ver = f"{ver['MajorMinorPatch']}{prerelease}"
-    with open("../compost_rpc/compost_rpc.py", "r") as file:
-        content = file.read()
-    content = re.sub(r'^__version__\s*=.*$', f"__version__ = \"{python_ver}\"", content, flags=re.MULTILINE)
-    with open("../compost_rpc/compost_rpc.py", "w") as file:
-        file.write(content)
+    replace_line("../compost_rpc/compost_rpc.py", r'^__version__\s*=.*$', f'__version__ = "{python_ver}"')
     run(["uv", "version", python_ver])
     print(f"Detected version {python_ver} from Git repository.")
+    return python_ver
+
+
+@target("Creating release commit")
+def release(release_type: str):
+    python_ver = version()
+    base_version_match = re.match(r"^(\d+\.\d+\.\d+)", python_ver)
+    if not base_version_match:
+        print(f"Version '{python_ver}' does not start with MAJOR.MINOR.PATCH")
+        sys.exit(1)
+    new_version = bump_version(base_version_match.group(1), release_type)
+
+    replace_line("../compost_rpc/compost_rpc.py", r'^__version__\s*=.*$', f'__version__ = "{new_version}"')
+    run(["uv", "version", new_version])
+
+    run(["git", "-C", "..", "add", "compost_rpc/compost_rpc.py", "pyproject.toml"])
+    run(["git", "-C", "..", "commit", "-m", f"chore: Release version {new_version}"])
+
+    print(f"Created release commit for version {new_version}.")
 
 @target("Generating code")
 def codegen():
@@ -181,13 +234,24 @@ def test_powerpc():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="test.py", description="Compost test runner")
-    parser.add_argument("target", nargs="?", default="test", choices=targets.keys(), help="Target to run")
+    parser = argparse.ArgumentParser(prog="x.py", description="Compost development script")
+    subparsers = parser.add_subparsers(dest="target")
+    parser.set_defaults(target="test")
+
+    for target_name in targets:
+        target_parser = subparsers.add_parser(target_name, help=f"Run '{target_name}' target")
+        if target_name == "release":
+            target_parser.add_argument("release_type", choices=("major", "minor", "patch"), help="Release bump type")
+
     args = parser.parse_args()
+
+    target_kwargs = {}
+    if args.target == "release":
+        target_kwargs["release_type"] = args.release_type
 
     # Change current working directory to the script directory
     os.chdir(sys.path[0] + "/test")
 
-    targets[args.target]()
+    targets[args.target](**target_kwargs)
 
     print("Finished successfully")
