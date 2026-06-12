@@ -134,7 +134,7 @@ public class Session : IAsyncDisposable
         catch (Exception e)
         {
             FetchAndRemoveTransaction(txn.TxnID);
-            txn.SetException(e);
+            txn.TrySetException(e);
             return false;
         }
     }
@@ -213,12 +213,14 @@ public class Session : IAsyncDisposable
             else
                 finished = await Task.WhenAny(txn.Response).ConfigureAwait(false);
 
-            if (finished != txn.Response && !txn.Response.IsCompleted)
+            if (finished != txn.Response)
             {
                 TimeoutException timeout = new();
-                txn.SetException(timeout);
-                FetchAndRemoveTransaction(txn.TxnID);
-                throw timeout;
+                if (txn.TrySetException(timeout))
+                {
+                    FetchAndRemoveTransaction(txn.TxnID);
+                    throw timeout;
+                }
             }
 
             return await txn.Response.ConfigureAwait(false);
@@ -308,7 +310,7 @@ public class Session : IAsyncDisposable
             if (isNotification)
                 TryInvokeNotification(msg);
             else
-                txn?.SetResponse(msg);
+                txn?.TrySetResponse(msg);
         }
     }
 
@@ -386,7 +388,10 @@ public class Session : IAsyncDisposable
     /// <returns></returns>
     protected bool CheckNotificationExists(ushort rpcId)
     {
-        return _notifDict.ContainsKey(rpcId);
+        lock (_notifMutex)
+        {
+            return _notifDict.ContainsKey(rpcId);
+        }
     }
 
     /// <summary>

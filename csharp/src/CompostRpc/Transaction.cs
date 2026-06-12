@@ -14,7 +14,7 @@ public class Transaction
     public Message Request { get; private set; }
     public byte TxnID { get => Request.Header.Txn; }
     /// <summary>
-    /// Task that will be completed when <see cref="SetResponse"/> is called.
+    /// Task that will be completed when <see cref="TrySetResponse"/> is called.
     /// </summary>
     public Task<Message> Response { get => _txnTask.Task; }
     public bool IsCompleted { get => _txnTask.Task.IsCompleted; }
@@ -31,22 +31,23 @@ public class Transaction
     }
 
     /// <summary>
-    /// Assigns response to the request.
+    /// Tries to assign response message as the transaction result.
     /// </summary>
-    /// <param name="respBuffer">Buffer with the response.
-    /// </param>
-    public void SetResponse(Message response)
+    /// <param name="response">Message with the response.</param>
+    /// <returns>True when response was assigned.</returns>
+    public bool TrySetResponse(Message response)
     {
-        _txnTask.TrySetResult(response);
+        return _txnTask.TrySetResult(response);
     }
 
     /// <summary>
-    /// Assigns exception to the request.
+    /// Tries to assign exception to the request.
     /// </summary>
     /// <param name="exception">Exception that failed the transaction.</param>
-    public void SetException(Exception exception)
+    /// <returns>True when exception was assigned.</returns>
+    public bool TrySetException(Exception exception)
     {
-        _txnTask.TrySetException(exception);
+        return _txnTask.TrySetException(exception);
     }
 
     /// <summary>
