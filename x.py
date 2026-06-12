@@ -85,33 +85,9 @@ def replace_line(path: str, pattern: str, replacement: str):
     with open(path, "w", encoding="utf-8") as file:
         file.write(new_content)
 
-
-def bump_version(version: str, bump_type: str) -> str:
-    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", version)
-    if not match:
-        print(f"Current version '{version}' is not in MAJOR.MINOR.PATCH format.")
-        sys.exit(1)
-
-    major, minor, patch = map(int, match.groups())
-
-    if bump_type == "major":
-        major += 1
-        minor = 0
-        patch = 0
-    elif bump_type == "minor":
-        minor += 1
-        patch = 0
-    elif bump_type == "patch":
-        patch += 1
-    else:
-        print(f"Unsupported bump type: {bump_type}")
-        sys.exit(1)
-
-    return f"{major}.{minor}.{patch}"
-
 @target("Generating version from Git")
 def version():
-    ver = json.loads(run(["dotnet-gitversion"], capture_output=True, text=True).stdout)
+    ver = json.loads(run(["dotnet", "tool", "exec", "GitVersion.Tool"], capture_output=True, text=True).stdout)
     if ver['PreReleaseLabel']:
         prerelease = f".{ver['PreReleaseLabel']}{ver['PreReleaseNumber']}"
     else:
@@ -125,18 +101,14 @@ def version():
 
 @target("Creating release commit")
 def release(release_type: str):
-    python_ver = version()
-    base_version_match = re.match(r"^(\d+\.\d+\.\d+)", python_ver)
-    if not base_version_match:
-        print(f"Version '{python_ver}' does not start with MAJOR.MINOR.PATCH")
-        sys.exit(1)
-    new_version = bump_version(base_version_match.group(1), release_type)
+    run(["uv", "version", "--bump", release_type])
+    new_version = run(["uv", "version", "--short"], capture_output=True, text=True).stdout.strip()
 
     replace_line("../compost_rpc/compost_rpc.py", r'^__version__\s*=.*$', f'__version__ = "{new_version}"')
-    run(["uv", "version", new_version])
 
     run(["git", "-C", "..", "add", "compost_rpc/compost_rpc.py", "pyproject.toml"])
     run(["git", "-C", "..", "commit", "-m", f"chore: Release version {new_version}"])
+    run(["git", "-C", "..", "tag", f"v{new_version}"])
 
     print(f"Created release commit for version {new_version}.")
 
