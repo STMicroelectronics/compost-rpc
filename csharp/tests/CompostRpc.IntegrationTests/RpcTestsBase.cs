@@ -132,7 +132,7 @@ public abstract class RpcTestsBase
             TimeSpan.FromSeconds(2)));
         Assert.Equal((uint)2, _unit.BaseSession.PendingTransactionCount);
 
-        await Assert.ThrowsAsync<TransportException>(
+        await Assert.ThrowsAsync<SessionException>(
             () => _unit.DelayAsync(delayMs));
 
         await Task.WhenAll(first, second);

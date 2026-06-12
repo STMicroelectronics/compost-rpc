@@ -4,14 +4,14 @@ namespace CompostRpc;
 /// </summary>
 
 [Serializable]
-public class TransportException : Exception
+public class SessionException : Exception
 {
-    public TransportException()
+    public SessionException()
         : base() { }
-    public TransportException(string message)
+    public SessionException(string message)
         : base(message)
     { }
-    public TransportException(string message, Exception innerException)
+    public SessionException(string message, Exception innerException)
         : base(message, innerException)
     { }
 }

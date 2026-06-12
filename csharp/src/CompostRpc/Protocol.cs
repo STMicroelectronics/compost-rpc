@@ -98,7 +98,7 @@ public abstract partial class Protocol : IAsyncDisposable
     /// </summary>
     /// <param name="rpcName">Name of the RPC function</param>
     /// <param name="args">Arguments of a RPC function</param>
-    /// <exception cref="TransportException"></exception>
+    /// <exception cref="SessionException"></exception>
     /// <exception cref="ProtocolException"></exception>
     /// <exception cref="TimeoutException"></exception>
     /// <returns><see cref="Task"/> with no value.</returns>
@@ -115,7 +115,7 @@ public abstract partial class Protocol : IAsyncDisposable
     /// <param name="rpcName">Name of the RPC function</param>
     /// <param name="args">Arguments of a RPC function</param>
     /// <typeparam name="TResult">Return value type</typeparam>
-    /// <exception cref="TransportException"></exception>
+    /// <exception cref="SessionException"></exception>
     /// <exception cref="ProtocolException"></exception>
     /// <exception cref="TimeoutException"></exception>
     /// <returns><see cref="Task"/> with RPC call result.</returns>

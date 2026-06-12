@@ -101,7 +101,7 @@ public class Session : IAsyncDisposable
     /// <param name="responseId">Message type of the response</param>
     /// <param name="requestArgs">Data to send in the request</param>
     /// <param name="requestShape">Request shape. Avoids reflection calls if provided.</param>
-    /// <exception cref="TransportException"></exception>
+    /// <exception cref="SessionException"></exception>
     /// <exception cref="TimeoutException"></exception>
     /// 
     public Task<Message> InvokeRawRpcAsync(ushort requestId, object[] requestArgs, MessageShape requestShape)
@@ -159,7 +159,7 @@ public class Session : IAsyncDisposable
         lock (_txnDictMutex)
         {
             if ((_concurrentTransactionCount + _queue.Count + 1) > PendingTransactionLimit)
-                throw new TransportException(Strings.TransactionLimitReached());
+                throw new SessionException(Strings.TransactionLimitReached());
 
             _queue.Enqueue(txn);
         }
@@ -174,7 +174,7 @@ public class Session : IAsyncDisposable
     /// </summary>
     /// <param name="request"></param>
     /// <returns></returns>
-    /// <exception cref="TransportException"></exception>
+    /// <exception cref="SessionException"></exception>
     /// <exception cref="TimeoutException"></exception>
     private async Task<Message> InvokeRawRpcAsync(Message request)
     {
@@ -310,7 +310,7 @@ public class Session : IAsyncDisposable
             //* Creates buffer for response (so that the reading thread
             //* knows this respID is valid)
             if (_txnDict[txn.TxnID] != null)
-                throw new TransportException(Strings.TransactionWrapAround());
+                throw new SessionException(Strings.TransactionWrapAround());
             _txnDict[txn.TxnID] = txn;
             _concurrentTransactionCount += 1;
         }
