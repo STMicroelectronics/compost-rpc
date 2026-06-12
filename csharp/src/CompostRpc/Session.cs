@@ -133,13 +133,13 @@ public class Session : IAsyncDisposable
         }
         catch (Exception e)
         {
-            FetchAndRemoveTransaction(txn.TxnID);
+            RemoveAwaitingTransaction(txn.TxnID);
             txn.TrySetException(e);
             return false;
         }
     }
 
-    private bool TryTransactionDispatchFromQueue()
+    private bool TryDispatchTransactionFromQueue()
     {
         Transaction? txn;
         lock (_txnDictMutex)
@@ -153,7 +153,7 @@ public class Session : IAsyncDisposable
                     return false;
             } while (txn.IsCompleted);
 
-            AddTransaction(txn);
+            AddAwaitingTransaction(txn);
         }
 
         return TrySendTransactionRequest(txn);
@@ -172,7 +172,7 @@ public class Session : IAsyncDisposable
             // dispatch this request immediately without touching the queue.
             if (_queue.Count == 0 && _concurrentTransactionCount < ConcurrencyLimit)
             {
-                AddTransaction(txn);
+                AddAwaitingTransaction(txn);
                 sendRequestDirectly = true;
             }
             else
@@ -187,7 +187,7 @@ public class Session : IAsyncDisposable
         }
         else
         {
-            TryTransactionDispatchFromQueue();
+            TryDispatchTransactionFromQueue();
         }
     }
 
@@ -218,7 +218,7 @@ public class Session : IAsyncDisposable
                 TimeoutException timeout = new();
                 if (txn.TrySetException(timeout))
                 {
-                    FetchAndRemoveTransaction(txn.TxnID);
+                    RemoveAwaitingTransaction(txn.TxnID);
                     throw timeout;
                 }
             }
@@ -227,7 +227,7 @@ public class Session : IAsyncDisposable
         }
         finally
         {
-            TryTransactionDispatchFromQueue();
+            TryDispatchTransactionFromQueue();
         }
     }
 
@@ -299,7 +299,7 @@ public class Session : IAsyncDisposable
             Transaction? txn = null;
             if (!isNotification && msg.Header.Resp)
             {
-                txn = FetchAndRemoveTransaction(msg.Header.Txn);
+                txn = RemoveAwaitingTransaction(msg.Header.Txn);
                 if (txn == null)
                 {
                     UnexpectedMessageReceived?.Invoke(this, new MessageReceivedEventArgs(msg));
@@ -329,7 +329,7 @@ public class Session : IAsyncDisposable
     /// matching response is received.
     /// </summary>
     /// <param name="txn">CompostTransaction object</param>
-    protected void AddTransaction(Transaction txn)
+    protected void AddAwaitingTransaction(Transaction txn)
     {
         lock (_txnDictMutex)
         {
@@ -349,7 +349,7 @@ public class Session : IAsyncDisposable
     /// <param name="respId">Response message type</param>
     /// <param name="txnId">Transaction ID</param>
     /// <returns>Null if no transaction is found.</returns>
-    protected Transaction? FetchAndRemoveTransaction(byte txnId)
+    protected Transaction? RemoveAwaitingTransaction(byte txnId)
     {
         lock (_txnDictMutex)
         {
@@ -364,7 +364,7 @@ public class Session : IAsyncDisposable
     /// <summary>
     /// Clears database with pending transactions.
     /// </summary>
-    protected void ClearTransactions()
+    protected void ClearPendingTransactions()
     {
         lock (_txnDictMutex)
         {
@@ -424,7 +424,7 @@ public class Session : IAsyncDisposable
                 $"Pending read operation over {_transport.GetType().Name} did not finish gracefully. " +
                 $"Ensure implementation of {nameof(ITransport.ReadMessageAsync)} respects cancellation token.");
         _readCts.Dispose();
-        ClearTransactions();
+        ClearPendingTransactions();
         GC.SuppressFinalize(this);
     }
 }
