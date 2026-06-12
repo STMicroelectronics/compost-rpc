@@ -121,24 +121,6 @@ public class Session : IAsyncDisposable
         return InvokeRawRpcAsync(request);
     }
 
-    private bool TrySendTransactionRequest(Transaction txn)
-    {
-        try
-        {
-            lock (_streamWriteMutex)
-            {
-                _transport.WriteMessage(txn.Request);
-            }
-            return true;
-        }
-        catch (Exception e)
-        {
-            RemoveAwaitingTransaction(txn.TxnID);
-            txn.TrySetException(e);
-            return false;
-        }
-    }
-
     private bool TryDispatchTransactionFromQueue()
     {
         Transaction? txn;
@@ -156,39 +138,33 @@ public class Session : IAsyncDisposable
             AddAwaitingTransaction(txn);
         }
 
-        return TrySendTransactionRequest(txn);
+        try
+        {
+            lock (_streamWriteMutex)
+            {
+                _transport.WriteMessage(txn.Request);
+            }
+            return true;
+        }
+        catch (Exception e)
+        {
+            RemoveAwaitingTransaction(txn.TxnID);
+            txn.TrySetException(e);
+            return false;
+        }
     }
 
     private void EnqueueTransaction(Transaction txn)
     {
-        bool sendRequestDirectly = false;
-
         lock (_txnDictMutex)
         {
             if ((_concurrentTransactionCount + _queue.Count + 1) > PendingTransactionLimit)
                 throw new TransportException(Strings.TransactionLimitReached());
 
-            // Fast path: if there is free concurrency capacity and no backlog,
-            // dispatch this request immediately without touching the queue.
-            if (_queue.Count == 0 && _concurrentTransactionCount < ConcurrencyLimit)
-            {
-                AddAwaitingTransaction(txn);
-                sendRequestDirectly = true;
-            }
-            else
-            {
-                _queue.Enqueue(txn);
-            }
+            _queue.Enqueue(txn);
         }
 
-        if (sendRequestDirectly)
-        {
-            TrySendTransactionRequest(txn);
-        }
-        else
-        {
-            TryDispatchTransactionFromQueue();
-        }
+        TryDispatchTransactionFromQueue();
     }
 
     /// <summary>
@@ -295,22 +271,20 @@ public class Session : IAsyncDisposable
             {
                 return;
             }
-            bool isNotification = CheckNotificationExists(msg.Header.RpcId) && !msg.Header.Resp;
-            Transaction? txn = null;
-            if (!isNotification && msg.Header.Resp)
+            if (!msg.Header.Resp)
             {
-                txn = RemoveAwaitingTransaction(msg.Header.Txn);
-                if (txn == null)
-                {
-                    UnexpectedMessageReceived?.Invoke(this, new MessageReceivedEventArgs(msg));
-                    continue;
-                }
+                TryInvokeNotification(msg);
+                continue;
             }
 
-            if (isNotification)
-                TryInvokeNotification(msg);
-            else
-                txn?.TrySetResponse(msg);
+            Transaction? txn = RemoveAwaitingTransaction(msg.Header.Txn);
+            if (txn == null)
+            {
+                UnexpectedMessageReceived?.Invoke(this, new MessageReceivedEventArgs(msg));
+                continue;
+            }
+
+            txn.TrySetResponse(msg);
         }
     }
 
@@ -381,25 +355,9 @@ public class Session : IAsyncDisposable
     }
 
     /// <summary>
-    /// Checks if Compost notification with specified message type
-    /// is implemented in the protocol.
-    /// </summary>
-    /// <param name="rpcId">Message type of the notification</param>
-    /// <returns></returns>
-    protected bool CheckNotificationExists(ushort rpcId)
-    {
-        lock (_notifMutex)
-        {
-            return _notifDict.ContainsKey(rpcId);
-        }
-    }
-
-    /// <summary>
-    /// If the message type is valid (<seealso cref="CheckNotificationExists"/>),
-    /// invoke subscribed handlers.
+    /// Invoke subscribed handlers for a known notification.
     /// </summary>
     /// <param name="notification">Notification message</param>
-    /// <returns></returns>
     protected void TryInvokeNotification(Message notification)
     {
         lock (_notifMutex)
