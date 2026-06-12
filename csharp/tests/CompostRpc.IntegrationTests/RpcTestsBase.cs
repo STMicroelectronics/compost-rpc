@@ -115,4 +115,27 @@ public abstract class RpcTestsBase
         Assert.Equal(expected_str, dt.AsText);
         Assert.Equal(expected_str.Select(x => (byte)(x - '0')).ToList(), dt.AsDigits);
     }
+
+    [Fact]
+    public async Task PendingTransactionLimitIsEnforced()
+    {
+        const uint delayMs = 350;
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        _unit.BaseSession.ConcurrencyLimit = 1;
+        _unit.BaseSession.PendingTransactionLimit = 2;
+
+        Task first = Task.Run(() => _unit.DelayAsync(delayMs), ct);
+        Task second = Task.Run(() => _unit.DelayAsync(delayMs), ct);
+
+        Assert.True(SpinWait.SpinUntil(
+            () => _unit.BaseSession.PendingTransactionCount == 2,
+            TimeSpan.FromSeconds(2)));
+        Assert.Equal((uint)2, _unit.BaseSession.PendingTransactionCount);
+
+        await Assert.ThrowsAsync<TransportException>(
+            () => _unit.DelayAsync(delayMs));
+
+        await Task.WhenAll(first, second);
+        Assert.Equal((uint)0, _unit.BaseSession.PendingTransactionCount);
+    }
 }
