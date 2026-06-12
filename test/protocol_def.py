@@ -198,6 +198,10 @@ class TestProtocol(Protocol):
     def struct_in_param(self, structure: ListFirstAttr):
         """Send structure in parameter."""
 
+    @rpc(0xC10)
+    def delay(self, delay_ms: U32):
+        """Block for specified amount of milliseconds."""
+
     @notification(0xE00)
     def notify_date(self, date: MockDate):
         """Notifies a current date."""

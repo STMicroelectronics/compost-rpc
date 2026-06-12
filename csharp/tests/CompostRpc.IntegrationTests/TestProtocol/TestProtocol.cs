@@ -133,6 +133,13 @@ public partial class TestProtocol(ITransport transport) : Protocol(transport)
         => InvokeRpcAsync([structure]);
 
     /// <summary>
+    /// Block for specified amount of milliseconds.
+    /// </summary>
+    [Rpc(0xc10)]
+    public Task DelayAsync(uint delayMs)
+        => InvokeRpcAsync([delayMs]);
+
+    /// <summary>
     /// Notifies a current date.
     /// </summary>
     [Notification(0xe00)]

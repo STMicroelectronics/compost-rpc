@@ -7,7 +7,7 @@
 void assert(int x)
 {
     if (!x) {
-        fprintf(stderr, "Assertion failed: %s:%d\n", __FILE__,__LINE__);
+        fprintf(stderr, "Assertion failed: %s:%d\n", __FILE__, __LINE__);
         exit(1);
     }
 }
@@ -46,15 +46,15 @@ float slice_avg(struct CompostSliceI16 data)
 
 #define MOCK_DATE_FMT_LEN 8
 
-void set_mock_date(struct MockDate* dest, time_t epoch)
+void set_mock_date(struct MockDate *dest, time_t epoch)
 {
     if (dest->as_digits.ptr == NULL || dest->as_text.ptr == NULL)
         return;
     struct tm *timeinfo = gmtime(&epoch);
     dest->day = timeinfo->tm_mday;
-    dest->month = timeinfo->tm_mon + 1; 
+    dest->month = timeinfo->tm_mon + 1;
     dest->year = timeinfo->tm_year + 1900;
-    char tmp[dest->as_text.len+1];
+    char tmp[dest->as_text.len + 1];
     snprintf(tmp, sizeof(tmp), "%02d%02d%04d", dest->day, dest->month, dest->year);
     compost_str_copy(dest->as_text, tmp);
     for (int i = 0; i < dest->as_text.len; i++)
@@ -99,7 +99,7 @@ float divide_float_handler(float a, float b)
 }
 
 struct CompostSliceU8 caesar_cipher_handler(struct CompostSliceU8 str, uint8_t offset,
-                                          struct CompostAlloc *alloc)
+                                            struct CompostAlloc *alloc)
 {
     struct CompostSliceU8 ciphertext = compost_slice_u8_new(alloc, str.len);
     for (int i = 0; i < str.len; i++)
@@ -126,7 +126,8 @@ struct CompostSliceU8 sort_bytes_handler(struct CompostSliceU8 data, struct Comp
     return sorted;
 }
 
-struct ListFirstAttr list_first_attr_handler(struct CompostSliceI16 data, struct CompostAlloc *alloc)
+struct ListFirstAttr list_first_attr_handler(struct CompostSliceI16 data,
+                                             struct CompostAlloc *alloc)
 {
     struct ListFirstAttr ret = ListFirstAttr_init(alloc, data.len);
     compost_slice_copy(ret.data, data);
@@ -154,7 +155,7 @@ struct ListLastAttr list_last_attr_handler(struct CompostSliceI16 data, struct C
 }
 
 struct TwoListAttr two_list_attr_handler(struct CompostSliceI16 data_a,
-                                     struct CompostSliceI16 data_b, struct CompostAlloc *alloc)
+                                         struct CompostSliceI16 data_b, struct CompostAlloc *alloc)
 {
     struct TwoListAttr ret = TwoListAttr_init(alloc, data_a.len, data_b.len);
     compost_slice_copy(ret.data_a, data_a);
@@ -184,7 +185,7 @@ struct CompostSliceU8 emoji_handler(struct CompostSliceU8 text, struct CompostAl
 }
 
 struct CompostSliceU32 cat_lists_handler(struct CompostSliceU32 list_a,
-                                       struct CompostSliceU32 list_b, struct CompostAlloc *alloc)
+                                         struct CompostSliceU32 list_b, struct CompostAlloc *alloc)
 {
     struct CompostSliceU32 ret = compost_slice_u32_new(alloc, list_a.len + list_b.len);
     for (int i = 0; i < list_a.len; i++) {
@@ -202,8 +203,7 @@ struct MockLfsr get_random_number_handler(uint64_t seed, uint8_t iter, struct Co
     lfsr.polynomial = 0xD800000000000000; //< Copy this value when reimplementing this test
     // LFSR does not work for seed=0 -> store any other value
     lfsr.value = seed == 0 ? 0x1F2E3D4C5B6A7988 : seed;
-    for (int i = 0; i < iter; i++)
-    {
+    for (int i = 0; i < iter; i++) {
         uint8_t feedback = lfsr.value & 1;
         // Shift the seed to the right by one bit
         lfsr.value >>= 1;
@@ -256,7 +256,7 @@ void notify_motor_report_handler(struct MockMotorReport report)
     assert(report.direction == MOTOR_DIRECTION_UP);
     assert(report.voltage.len == 20);
     assert(report.current.len == 20);
-    
+
     // Send back a notification as an async response
     struct MockMotorControl control = MockMotorControl_init();
     control.state = MOTOR_STATE_STOP;
@@ -276,6 +276,14 @@ void struct_in_param_handler(struct ListFirstAttr structure)
     assert(structure.data.len == 10);
     assert(structure.min == 1);
     assert(structure.max == 10);
+}
+
+void delay_handler(uint32_t delay_ms)
+{
+    clock_t start = clock();
+    clock_t wait = (clock_t)(((double)delay_ms / 1000.0) * (double)CLOCKS_PER_SEC);
+    while ((clock() - start) < wait)
+        ;
 }
 
 void notify_bitfields_handler(struct BitfieldStruct config)

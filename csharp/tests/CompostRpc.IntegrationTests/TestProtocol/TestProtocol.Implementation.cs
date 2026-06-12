@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading;
 using CompostRpc.IntegrationTests.Utils;
 using CompostRpc.IntegrationTests.Mocks;
 
@@ -15,11 +16,11 @@ public partial class TestProtocol : Protocol
     [Rpc(0x222)]
     public Task<uint> AddIntUnimplementedAsync(uint a, uint b)
         => InvokeRpcAsync<uint>([a, b]);
-    
+
     [RpcImplementation(nameof(TriggerNotificationAsync))]
-    public void TriggerNotificationImpl (ushort rpcId)
+    public void TriggerNotificationImpl(ushort rpcId)
     {
-        object[]? data = rpcId switch 
+        object[]? data = rpcId switch
         {
             0xe00 => [EpochToDateImpl((int)DateTimeOffset.Now.ToUnixTimeSeconds())],
             0xe02 => [true],
@@ -61,7 +62,7 @@ public partial class TestProtocol : Protocol
     [RpcImplementation(nameof(DivideFloatAsync))]
     public static float DivideFloatImpl(float a, float b)
     {
-        return a/b;
+        return a / b;
     }
 
     [RpcImplementation(nameof(CaesarCipherAsync))]
@@ -78,7 +79,7 @@ public partial class TestProtocol : Protocol
         return data;
     }
 
-    private static T CalculateMinMax<T> (List<short> data) where T : new()
+    private static T CalculateMinMax<T>(List<short> data) where T : new()
     {
         T ret = new();
         var retType = typeof(T);
@@ -89,25 +90,25 @@ public partial class TestProtocol : Protocol
     }
 
     [RpcImplementation(nameof(ListFirstAttrAsync))]
-    public static ListFirstAttr ListFirstAttrImpl (List<short> data)
+    public static ListFirstAttr ListFirstAttrImpl(List<short> data)
     {
         return CalculateMinMax<ListFirstAttr>(data);
     }
 
     [RpcImplementation(nameof(ListMidAttrAsync))]
-    public static ListMidAttr ListMidAttrImpl (List<short> data)
+    public static ListMidAttr ListMidAttrImpl(List<short> data)
     {
         return CalculateMinMax<ListMidAttr>(data);
     }
 
     [RpcImplementation(nameof(ListLastAttrAsync))]
-    public static ListLastAttr ListLastAttrImpl (List<short> data)
+    public static ListLastAttr ListLastAttrImpl(List<short> data)
     {
         return CalculateMinMax<ListLastAttr>(data);
     }
 
     [RpcImplementation(nameof(TwoListAttrAsync))]
-    public static TwoListAttr TwoListAttrImpl (List<short> data_a, List<short> data_b)
+    public static TwoListAttr TwoListAttrImpl(List<short> data_a, List<short> data_b)
     {
         return new TwoListAttr()
         {
@@ -118,9 +119,9 @@ public partial class TestProtocol : Protocol
             DataB = data_b
         };
     }
-    
+
     [RpcImplementation(nameof(EpochToDateAsync))]
-    public static MockDate EpochToDateImpl (int epoch)
+    public static MockDate EpochToDateImpl(int epoch)
     {
         var dt = DateTimeOffset.FromUnixTimeSeconds(epoch);
         MockDate ret = new()
@@ -132,5 +133,12 @@ public partial class TestProtocol : Protocol
         };
         ret.AsDigits = ret.AsText.Select(x => (byte)(x - '0')).ToList();
         return ret;
+    }
+
+    [RpcImplementation(nameof(DelayAsync))]
+    public static void DelayImpl(uint delayMs)
+    {
+        int sleepMs = delayMs > int.MaxValue ? int.MaxValue : (int)delayMs;
+        Thread.Sleep(sleepMs);
     }
 }
