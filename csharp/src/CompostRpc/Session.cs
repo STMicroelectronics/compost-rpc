@@ -1,6 +1,7 @@
-using System.Diagnostics;
-using System.Threading.Tasks;
 using CompostRpc.Resources;
+#if NETSTANDARD2_0
+using CompostRpc.Compatibility;
+#endif
 
 namespace CompostRpc;
 
@@ -20,12 +21,51 @@ public class Session : IAsyncDisposable
     private readonly CancellationTokenSource _readCts;
     private readonly Task _readTask;
     private readonly Transaction?[] _txnDict;
+    private readonly Queue<Transaction> _queue;
     private readonly Dictionary<ushort, Action<Message>> _notifDict;
+    private uint _concurrencyLimit = 1;
+    private uint _concurrentTransactionCount;
     /// <summary>
     /// Timeout for <see cref="InvokeRawRpcAsync"/>
     /// </summary>
     /// <value>Timeout is disabled by setting it to zero.</value>
     public TimeSpan TransactionTimeout { get; set; }
+
+    /// <summary>
+    /// Limits how many transactions can be concurrently processed by the server.
+    /// Allowed range is 1 to 255 (inclusive).
+    /// </summary>
+    public uint ConcurrencyLimit
+    {
+        get => _concurrencyLimit;
+        set
+        {
+            if (value < 1 || value > 255)
+                throw new ArgumentOutOfRangeException(nameof(ConcurrencyLimit),
+                    $"{nameof(ConcurrencyLimit)} must be between 1 and 255.");
+            _concurrencyLimit = value;
+        }
+    }
+
+    /// <summary>
+    /// Limits how many transactions can be pending
+    /// </summary>
+    public uint PendingTransactionLimit { get; set; } = 255;
+
+    /// <summary>
+    /// Number of transactions currently held by the session.
+    /// </summary>
+    public uint PendingTransactionCount
+    {
+        get
+        {
+            lock (_txnDictMutex)
+            {
+                return (uint)_queue.Count + _concurrentTransactionCount;
+            }
+        }
+    }
+
     /// <summary>
     /// Expected transaction ID of next RPC call 
     /// </summary>
@@ -43,6 +83,7 @@ public class Session : IAsyncDisposable
         _notifMutex = new object();
         _streamWriteMutex = new object();
         _txnDict = new Transaction?[byte.MaxValue + 1];
+        _queue = [];
         _notifDict = [];
 
         _readCts = new CancellationTokenSource();
@@ -52,7 +93,8 @@ public class Session : IAsyncDisposable
     /// <summary>
     /// Processes Compost RPC call. 
     /// Payload is sent to a device and than a valid response will be awaited,
-    /// at most for the duration specified by <see cref="TransactionTimeout"/>. Device must be connected
+    /// at most for the duration specified by <see cref="TransactionTimeout"/>.
+    /// Device must be connected
     /// when this method called.
     /// </summary>
     /// <param name="requestId">Message type of the request</param>
@@ -79,6 +121,76 @@ public class Session : IAsyncDisposable
         return InvokeRawRpcAsync(request);
     }
 
+    private bool TrySendTransactionRequest(Transaction txn)
+    {
+        try
+        {
+            lock (_streamWriteMutex)
+            {
+                _transport.WriteMessage(txn.Request);
+            }
+            return true;
+        }
+        catch (Exception e)
+        {
+            FetchAndRemoveTransaction(txn.TxnID);
+            txn.SetException(e);
+            return false;
+        }
+    }
+
+    private bool TryTransactionDispatchFromQueue()
+    {
+        Transaction? txn;
+        lock (_txnDictMutex)
+        {
+            if (_concurrentTransactionCount >= ConcurrencyLimit)
+                return false;
+
+            do
+            {
+                if (!_queue.TryDequeue(out txn) || txn is null)
+                    return false;
+            } while (txn.IsCompleted);
+
+            AddTransaction(txn);
+        }
+
+        return TrySendTransactionRequest(txn);
+    }
+
+    private void EnqueueTransaction(Transaction txn)
+    {
+        bool sendRequestDirectly = false;
+
+        lock (_txnDictMutex)
+        {
+            if ((_concurrentTransactionCount + _queue.Count + 1) > PendingTransactionLimit)
+                throw new TransportException(Strings.TransactionLimitReached());
+
+            // Fast path: if there is free concurrency capacity and no backlog,
+            // dispatch this request immediately without touching the queue.
+            if (_queue.Count == 0 && _concurrentTransactionCount < ConcurrencyLimit)
+            {
+                AddTransaction(txn);
+                sendRequestDirectly = true;
+            }
+            else
+            {
+                _queue.Enqueue(txn);
+            }
+        }
+
+        if (sendRequestDirectly)
+        {
+            TrySendTransactionRequest(txn);
+        }
+        else
+        {
+            TryTransactionDispatchFromQueue();
+        }
+    }
+
     /// <summary>
     /// This is a private base function for the InvokeRawRPCAsync that accepts
     /// already processed Message. It is not exposed because user might use any
@@ -91,22 +203,30 @@ public class Session : IAsyncDisposable
     private async Task<Message> InvokeRawRpcAsync(Message request)
     {
         Transaction txn = new(request);
-        AddTransaction(txn);
-        lock (_streamWriteMutex)
+        EnqueueTransaction(txn);
+
+        try
         {
-            _transport.WriteMessage(txn.Request);
+            Task finished;
+            if (TransactionTimeout.TotalMilliseconds > 0)
+                finished = await Task.WhenAny(txn.Response, Task.Delay(TransactionTimeout)).ConfigureAwait(false);
+            else
+                finished = await Task.WhenAny(txn.Response).ConfigureAwait(false);
+
+            if (finished != txn.Response && !txn.Response.IsCompleted)
+            {
+                TimeoutException timeout = new();
+                txn.SetException(timeout);
+                FetchAndRemoveTransaction(txn.TxnID);
+                throw timeout;
+            }
+
+            return await txn.Response.ConfigureAwait(false);
         }
-        Task finished;
-        if (TransactionTimeout.TotalMilliseconds > 0)
-            finished = await Task.WhenAny(txn.Response, Task.Delay(TransactionTimeout)).ConfigureAwait(false);
-        else
-            finished = await Task.WhenAny(txn.Response).ConfigureAwait(false);
-        if (finished is not Task<Message>)
+        finally
         {
-            FetchAndRemoveTransaction(txn.TxnID);
-            throw new TimeoutException();
+            TryTransactionDispatchFromQueue();
         }
-        return ((Task<Message>)finished).Result;
     }
 
     /// <summary>
@@ -216,6 +336,7 @@ public class Session : IAsyncDisposable
             if (_txnDict[txn.TxnID] != null)
                 throw new TransportException(Strings.TransactionWrapAround());
             _txnDict[txn.TxnID] = txn;
+            _concurrentTransactionCount += 1;
         }
     }
 
@@ -232,6 +353,8 @@ public class Session : IAsyncDisposable
         {
             var txn = _txnDict[txnId];
             _txnDict[txnId] = null;
+            if (txn != null)
+                _concurrentTransactionCount -= 1;
             return txn;
         }
     }
@@ -248,6 +371,10 @@ public class Session : IAsyncDisposable
                 _txnDict[i]?.Cancel();
                 _txnDict[i] = null;
             }
+            foreach (var queuedTxn in _queue)
+                queuedTxn.Cancel();
+            _queue.Clear();
+            _concurrentTransactionCount = 0;
         }
     }
 

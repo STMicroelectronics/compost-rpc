@@ -17,6 +17,7 @@ public class Transaction
     /// Task that will be completed when <see cref="SetResponse"/> is called.
     /// </summary>
     public Task<Message> Response { get => _txnTask.Task; }
+    public bool IsCompleted { get => _txnTask.Task.IsCompleted; }
 
     /// <summary>
     /// Creates an object that represents pending Compost transaction.
@@ -37,6 +38,15 @@ public class Transaction
     public void SetResponse(Message response)
     {
         _txnTask.TrySetResult(response);
+    }
+
+    /// <summary>
+    /// Assigns exception to the request.
+    /// </summary>
+    /// <param name="exception">Exception that failed the transaction.</param>
+    public void SetException(Exception exception)
+    {
+        _txnTask.TrySetException(exception);
     }
 
     /// <summary>

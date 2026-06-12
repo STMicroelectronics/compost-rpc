@@ -30,6 +30,7 @@
         internal static string QueriedSizeOnDynamicType() => "Can't get byte size because the type is dynamic";
         internal static string TransactionWrapAround() =>
             "Transaction buffer wrap-around detected. Too many hanging transactions.";
+        internal static string TransactionLimitReached() => "Number of transactions in the session queue reached maximum allowable limit.";
         internal static string UnexpectedTransactionId(int txn) =>
             $"Received message with transaction {txn}, but no pending transaction with the same ID could be found.";
         internal static string UnsupportedRequest(int rpcId) =>
