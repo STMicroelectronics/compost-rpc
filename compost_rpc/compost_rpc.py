@@ -1897,7 +1897,7 @@ class CSharpCodeGenerator(CodeGenerator):
         elif _issubclass(t, (Enum, _CompostStruct)):
             return f"{t.__name__}"
         elif _issubclass(t, (BitU)):
-            return "ulong" if t.size.bits >= 32 else "int"
+            return "ulong" if t.size.bits >= 32 else "uint"
         else:
             raise TypeError("Unsupported type")
 
