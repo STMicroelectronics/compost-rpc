@@ -2145,19 +2145,29 @@ class Generator:
                     if is_overwrite_response_valid:
                         break
                 if not overwrite_response:
-                    print(cf.info("No files were modified"))
-                    return
+                    print(cf.info("Existing files will not be overwritten"))
             print()
+        wrote_any = False
         for lang, output_items in self._output_cache.items():
             is_verbose = verbose[lang.generator.short_name]
-            if lang in to_overwrite:
-                if lang.as_typed_str(is_verbose) not in overwrite_response:
-                    print(cf.warn(f"Skipping {cf.bold(lang.as_info_str(is_verbose))} files"))
-                    continue
-            print(cf.success(f"Writing {cf.bold(lang.as_info_str(is_verbose))} files:"))
+            overwrite_denied = lang in to_overwrite and lang.as_typed_str(is_verbose) not in overwrite_response
+            wrote_lang = False
+            skipped_lang = False
             for path, content in output_items:
+                if overwrite_denied and path in to_overwrite[lang]:
+                    if not skipped_lang:
+                        print(cf.warn(f"Skipping existing {cf.bold(lang.as_info_str(is_verbose))} files:"))
+                        skipped_lang = True
+                    print(path)
+                    continue
+                if not wrote_lang:
+                    print(cf.success(f"Writing {cf.bold(lang.as_info_str(is_verbose))} files:"))
+                    wrote_lang = True
                 print(path)
                 path.write_text(content)
+                wrote_any = True
+        if not wrote_any:
+            print(cf.info("No files were modified"))
 
 
 def main():
