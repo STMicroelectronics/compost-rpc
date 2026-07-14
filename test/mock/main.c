@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
         }
         size_t msg_len = COMPOST_MSG_LEN(rx_buf);
         log_msg("  mock <- ", rx_buf, msg_len);
-        int16_t tx_len = compost_msg_process(tx_buf, sizeof(tx_buf), rx_buf, msg_len);
+        int16_t tx_len = compost_msg_process(tx_buf, sizeof(tx_buf), rx_buf, msg_len, NULL);
         log_msg("  mock -> ", tx_buf, tx_len);
 
         if (tx_len) {
@@ -119,7 +119,8 @@ int main(int argc, char *argv[])
         switch (notif_request) {
         case 0x0e00:
             time(&current_epoch);
-            struct MockDate date = epoch_to_date_handler(current_epoch, &alloc);
+            struct CompostCtx ctx = {.alloc = alloc};
+            struct MockDate date = epoch_to_date_handler(&ctx, current_epoch);
             tx_len = notify_date_store(tx_buf, date);
             break;
         case 0x0e02:

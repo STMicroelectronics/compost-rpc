@@ -252,6 +252,13 @@ struct CompostAlloc {
     uint16_t alloc_ctr;
 };
 
+struct CompostCtx {
+    struct CompostMsg rx;      //< Received message
+    struct CompostMsg tx;      //< Message to be transmitted
+    struct CompostAlloc alloc; //< Allocator for the TX buffer
+    void* user_ctx;            //< Pointer passed to compost_msg_process()
+};
+
 /**
  * @brief Processes incoming Compost message and prepares the response.
  * Call this function for every Compost message you receive.
@@ -259,10 +266,11 @@ struct CompostAlloc {
  * @param tx_buf_size Transmit buffer size in bytes
  * @param rx_buf Pointer to the buffer with incoming message
  * @param rx_buf_size Receive buffer valid data size in bytes
+ * @param user_ctx Pointer that is passed to the handler. Compost doesn't use it.
  * @return Size of valid data in bytes in the transmit buffer, or zero if there
  * is no message to send, or negative value if there was an error
  */
-int compost_msg_process(uint8_t *tx_buf, const size_t tx_buf_size, uint8_t *const rx_buf, const size_t rx_buf_size);
+int compost_msg_process(uint8_t *tx_buf, const size_t tx_buf_size, uint8_t *const rx_buf, const size_t rx_buf_size, void *user_ctx);
 
 /**
  * @brief Loads the message header from the buffer.

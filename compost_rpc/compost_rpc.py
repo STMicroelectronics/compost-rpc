@@ -656,7 +656,7 @@ class Header:
 
     def __repr__(self) -> str:
         return f"Header(len={self.len}, txn={self.txn}, rpc_id={hex(self.rpc_id)}, resp={self.resp})"
-    
+
     def payload_byte_len(self) -> int:
         """Returns the length of the payload in bytes."""
         return 4 * self.len
@@ -779,7 +779,7 @@ class Endpoint(Enum):
     LOCAL = 1
 
     def is_call_outbound(self, call: Rpc):
-        return (call.direction == CallDirection.TO_LOCAL and self == Endpoint.REMOTE 
+        return (call.direction == CallDirection.TO_LOCAL and self == Endpoint.REMOTE
                 or call.direction == CallDirection.TO_REMOTE and self == Endpoint.LOCAL
                 or call.direction == CallDirection.TWO_WAY)
     def is_call_inbound(self, call: Rpc):
@@ -1286,7 +1286,7 @@ class CodeGenerator(ABC):
         # Public properties, common to all generators - with sensible defaults set
         self._filename: str = self._protocol.__name__
         self._path: Path = Path(sys.path[0])
-    
+
     def _validate_endpoint(self, endpoint: Endpoint):
         for rpc in self._protocol._rpcs.values():
             if rpc.is_notification:
@@ -1300,9 +1300,9 @@ class CodeGenerator(ABC):
                 elif endpoint.is_call_outbound(rpc) and self.features.outbound_rpc:
                     continue
             msg = f"{self.name} generator cannot generate {self._protocol.__name__} for {'remote' if endpoint == Endpoint.REMOTE else 'local'} endpoint, because "
-            msg += f"{rpc.name} {'notification' if rpc.is_notification else 'RPC'} has unsupported call direction {rpc.direction.name}." 
+            msg += f"{rpc.name} {'notification' if rpc.is_notification else 'RPC'} has unsupported call direction {rpc.direction.name}."
             raise ValueError(msg)
-    
+
     @property
     def filename(self) -> str:
         """Filename used for generated source files."""
@@ -1339,7 +1339,7 @@ class CodeGenerator(ABC):
     def short_name(cls) -> str:
         """Short name used for user input"""
         ...
-    
+
     @property
     @abstractmethod
     def features(cls) -> CodeGeneratorFeatures:
@@ -1405,7 +1405,7 @@ class CCodeGenerator(CodeGenerator):
     @path_source.setter
     def path_source(self, value: Path):
         self._path_source = value
-    
+
     _primitive_type_map = {
         U8: "uint8_t",
         I8: "int8_t",
@@ -1475,8 +1475,8 @@ class CCodeGenerator(CodeGenerator):
     @classmethod
     def _handler_signature(cls, rpc: Rpc, as_caller: bool = False) -> _String:
         sig = rpc.call_sig
-        call_site_params = []
-        prototype_params = []
+        call_site_params = ["ctx"]
+        prototype_params = ["struct CompostCtx *ctx"]
         parameters_items = rpc.get_param_items()
         for name, typ in parameters_items:
             prototype_params.append(f"{cls._type(typ.annotation)} {name}")
@@ -1486,13 +1486,10 @@ class CCodeGenerator(CodeGenerator):
         elif rpc.is_notification:
             raise TypeError("Notification return value must be None")
         else:
-            if _is_type_dynamic(sig.return_annotation):
-                prototype_params.append("struct CompostAlloc *alloc")
-                call_site_params.append("&alloc")
             return_type = cls._type(sig.return_annotation)
         result_assignment = f"{return_type} ret = " if return_type != "void" else ""
         call_site = f"{result_assignment}{rpc.name}_handler({', '.join(call_site_params)});"
-        prototype = f"{return_type} {rpc.name}_handler({', '.join(prototype_params) if prototype_params else 'void'});"
+        prototype = f"{return_type} {rpc.name}_handler({', '.join(prototype_params)});"
         return _String(call_site if as_caller else prototype)
 
     def _define_type_helper(self, t: type, helper: str) -> None:
@@ -1638,7 +1635,7 @@ enum {t.__name__} {{
             code.add(f"{ptr} += {offset.bytes};")
             offset.bytes = 0
         return code, offset
-    
+
     def generate(self, endpoint: Endpoint = Endpoint.REMOTE) -> list[tuple[Path, str]]:
         self._validate_endpoint(endpoint)
         self._define_types()
@@ -1713,11 +1710,8 @@ size_t {notif.name}_store(uint8_t *tx_buf{params})
             sig = rpc.call_sig
             parameters_items = rpc.get_param_items()
             doc_prefix = "Deserialization/Serialization"
-            invoke_params = ["struct CompostMsg *tx"]
             if rpc.is_notification:
                 doc_prefix = "Deserialization"
-            if parameters_items:
-                invoke_params.append("const struct CompostMsg rx")
             invoke_prototype = _String()
             invoke_prototype += f"""
 /**
@@ -1730,32 +1724,32 @@ size_t {notif.name}_store(uint8_t *tx_buf{params})
 /**
  * {doc_prefix} function for {rpc.name} function
  */
-void invoke_{rpc.name}({", ".join(invoke_params)})
+void invoke_{rpc.name}(struct CompostCtx *ctx)
 {{
 """
             invoke_fn.indent_inc()
             if parameters_items:
-                invoke_fn.add("const uint8_t *src = rx.payload_buf;")
+                invoke_fn.add("const uint8_t *src = ctx->rx.payload_buf;")
             for name, t in parameters_items:
                 invoke_fn.add(self._load_call(t.annotation, dest = f"l_{name}", src = "&src"))
             if get_origin(sig.return_annotation) is list or _issubclass(sig.return_annotation, (bytes, str)):
                 invoke_fn.add((
-                    "struct CompostAlloc alloc = compost_alloc_init(tx->payload_buf + 2, tx->payload_buf_size - 2);"
+                    "ctx->alloc = compost_alloc_init(ctx->tx.payload_buf + 2, ctx->tx.payload_buf_size - 2);"
                 ))
             elif _issubclass(sig.return_annotation, _CompostStruct):
                 if sig.return_annotation.dynamic_members:
                     invoke_fn.add((
-                        f"struct CompostAlloc alloc = {sig.return_annotation.__name__}_alloc_init(tx->payload_buf + {sig.return_annotation.layout[0].bytes}, tx->payload_buf_size - {sig.return_annotation.layout[0].bytes});",
+                        f"ctx->alloc = {sig.return_annotation.__name__}_alloc_init(ctx->tx.payload_buf + {sig.return_annotation.layout[0].bytes}, ctx->tx.payload_buf_size - {sig.return_annotation.layout[0].bytes});",
                     ))
             invoke_fn.add(f"{self._handler_signature(rpc, as_caller=True)}")
             if sig.return_annotation is not Signature.empty:
-                invoke_fn.add('uint8_t *dest = tx->payload_buf;')
+                invoke_fn.add('uint8_t *dest = ctx->tx.payload_buf;')
                 invoke_fn.add(self._store_call(sig.return_annotation, "ret"))
             if sig.return_annotation is Signature.empty:
-                invoke_fn.add("tx->header.wlen = 0;")
+                invoke_fn.add("ctx->tx.header.wlen = 0;")
             else:
-                invoke_fn.add("tx->header.wlen = compost_bytes_to_words(dest - tx->payload_buf);")
-            invoke_fn.add(f"tx->header.rpc_id = {rpc.name.upper()};")
+                invoke_fn.add("ctx->tx.header.wlen = compost_bytes_to_words(dest - ctx->tx.payload_buf);")
+            invoke_fn.add(f"ctx->tx.header.rpc_id = {rpc.name.upper()};")
             invoke_fn += "}\n"
 
             protocol_header += invoke_prototype
@@ -1763,22 +1757,21 @@ void invoke_{rpc.name}({", ".join(invoke_params)})
 
 
         rpc_id_fns = """
-void compost_unknown_msg(struct CompostMsg *tx)
+void compost_unknown_msg(struct CompostCtx *ctx)
 {
-    tx->header.rpc_id = UNKNOWN_MSG;
-    tx->header.wlen = 0;
+    ctx->tx.header.rpc_id = UNKNOWN_MSG;
+    ctx->tx.header.wlen = 0;
 }
 
-void compost_invoke_switch(struct CompostMsg *tx, const struct CompostMsg rx)
+void compost_invoke_switch(struct CompostCtx *ctx)
 {
-    switch (rx.header.rpc_id) {
+    switch (ctx->rx.header.rpc_id) {
 """
         for rpc in self._protocol._rpcs.values():
             if rpc.is_notification and not endpoint.is_call_inbound(rpc):
                 continue
-            params = "(tx, rx)" if rpc.get_param_items() else "(tx)"
-            rpc_id_fns += f"        case {rpc.name.upper()}: invoke_{rpc.name}{params}; break;\n"
-        rpc_id_fns += """        default: compost_unknown_msg(tx);
+            rpc_id_fns += f"        case {rpc.name.upper()}: invoke_{rpc.name}(ctx); break;\n"
+        rpc_id_fns += """        default: compost_unknown_msg(ctx);
     }
 }
 """
@@ -1822,7 +1815,7 @@ class CSharpCodeGenerator(CodeGenerator):
     @property
     def short_name(cls) -> str:
         return "cs"
-    
+
     @property
     def features(cls) -> CodeGeneratorFeatures:
         """Features that the generator supports"""
@@ -2021,11 +2014,11 @@ class Generator:
         def as_info_str (self, with_endpoint: bool = True) -> str:
             endpoint_str = f" (endpoint: {self.endpoint.name.lower()})" if with_endpoint else ""
             return f"{self.generator.name}{endpoint_str}"
-        
+
         def as_typed_str (self, with_endpoint: bool = True) -> str:
             endpoint_str = f"_{self.endpoint.name.lower()}" if with_endpoint else ""
             return f"{self.generator.short_name}{endpoint_str}"
-    
+
     def __init__(self, protocol: type[Protocol]):
         if _issubclass(protocol, Protocol):
             self._protocol_class = protocol
@@ -2120,7 +2113,7 @@ class Generator:
             for path in existing:
                print(path)
             to_overwrite[lang] = existing
-        
+
         langs_typed = [x.as_typed_str(verbose[x.generator.short_name]) for x in to_overwrite.keys()]
         overwrite_response = langs_typed
         if to_overwrite:
