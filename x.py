@@ -23,8 +23,8 @@ CFLAGS = [
     "-pedantic",
     "-fanalyzer",
     "-Wno-analyzer-infinite-loop",
-    "-I.",
-    "-Imock",
+    "-Itest",
+    "-Itest/mock",
     "-DCOMPOST_DEBUG",
 ]
 
@@ -93,7 +93,7 @@ def version():
     else:
         prerelease = ""
     python_ver = f"{ver['MajorMinorPatch']}{prerelease}"
-    replace_line("../compost_rpc/compost_rpc.py", r'^__version__\s*=.*$', f'__version__ = "{python_ver}"')
+    replace_line("compost_rpc/compost_rpc.py", r'^__version__\s*=.*$', f'__version__ = "{python_ver}"')
     run(["uv", "version", python_ver])
     print(f"Detected version {python_ver} from Git repository.")
     return python_ver
@@ -104,80 +104,80 @@ def release(release_type: str):
     run(["uv", "version", "--bump", release_type])
     new_version = run(["uv", "version", "--short"], capture_output=True, text=True).stdout.strip()
 
-    replace_line("../compost_rpc/compost_rpc.py", r'^__version__\s*=.*$', f'__version__ = "{new_version}"')
+    replace_line("compost_rpc/compost_rpc.py", r'^__version__\s*=.*$', f'__version__ = "{new_version}"')
 
-    run(["git", "-C", "..", "add", "compost_rpc/compost_rpc.py", "pyproject.toml"])
-    run(["git", "-C", "..", "commit", "-m", f"chore: Release version {new_version}"])
-    run(["git", "-C", "..", "tag", f"v{new_version}"])
+    run(["git", "add", "compost_rpc/compost_rpc.py", "pyproject.toml"])
+    run(["git", "commit", "-m", f"chore: Release version {new_version}"])
+    run(["git", "tag", f"v{new_version}"])
 
     print(f"Created release commit for version {new_version}.")
 
 @target("Generating code")
 def codegen():
-    run([PYTHON, "protocol_def.py"])
+    run([PYTHON, "test/protocol_def.py"])
 
 
 @target("Testing slices", {codegen})
 def slices_test():
-    run([CC, *CFLAGS, "test_slice.c", "compost.c", "protocol_impl.c", "-o", "test_slice"])
-    run(["./test_slice"])
+    run([CC, *CFLAGS, "test/test_slice.c", "test/compost.c", "test/protocol_impl.c", "-o", "test/test_slice"])
+    run(["./test/test_slice"])
 
 
 @target("Testing slices (sanitized)", {codegen})
 def slices_sanitized_test():
-    run([CC, *CFLAGS, *CFLAGS_SANITIZED, "test_slice.c", "compost.c", "protocol_impl.c", "-o", "test_slice"])
-    run(["./test_slice"])
+    run([CC, *CFLAGS, *CFLAGS_SANITIZED, "test/test_slice.c", "test/compost.c", "test/protocol_impl.c", "-o", "test/test_slice"])
+    run(["./test/test_slice"])
 
 
 @target("Testing slices (PowerPC)", {codegen})
 def slices_powerpc_test():
-    run([CC_PPC, *CFLAGS, *CFLAGS_POWERPC, "test_slice.c", "compost.c", "protocol_impl.c", "-o", "test_slice"])
-    run(["qemu-ppc", "./test_slice"])
+    run([CC_PPC, *CFLAGS, *CFLAGS_POWERPC, "test/test_slice.c", "test/compost.c", "test/protocol_impl.c", "-o", "test/test_slice"])
+    run(["qemu-ppc", "./test/test_slice"])
 
 
 @target("Building mock", {codegen})
 def mock():
-    run([CC, *CFLAGS, "-o", "mock/compost_mock", "mock/main.c", "compost.c", "protocol_impl.c"])
+    run([CC, *CFLAGS, "-o", "test/mock/compost_mock", "test/mock/main.c", "test/compost.c", "test/protocol_impl.c"])
 
 
 @target("Building mock (sanitized)", {codegen})
 def mock_sanitized():
-    run([CC, *CFLAGS, *CFLAGS_SANITIZED, "-o", "mock/compost_mock", "mock/main.c", "compost.c", "protocol_impl.c"])
+    run([CC, *CFLAGS, *CFLAGS_SANITIZED, "-o", "test/mock/compost_mock", "test/mock/main.c", "test/compost.c", "test/protocol_impl.c"])
 
 
 @target("Checking mock", {mock})
 def mock_check():
-    run(["echo", '"00 01 02 03" | xxd -r -p | ./mock/compost_mock > /dev/null"'], shell=True)
+    run(['echo "00 01 02 03" | xxd -r -p | ./test/mock/compost_mock > /dev/null'], shell=True)
 
 
 @target("Testing Python with mock", {mock, mock_check})
 def mock_test():
-    run([PYTHON, "test_compost.py", "--mock", "./mock/compost_mock", "--log-cli-level", "DEBUG"])
+    run([PYTHON, "test/test_compost.py", "--mock", "./test/mock/compost_mock", "--log-cli-level", "DEBUG"])
 
 
 @target("Building mock (PowerPC)", {codegen})
 def mock_powerpc():
-    run([CC_PPC, *CFLAGS, *CFLAGS_POWERPC, "-o", "mock/compost_mock_ppc", "mock/main.c", "compost.c", "protocol_impl.c"])
+    run([CC_PPC, *CFLAGS, *CFLAGS_POWERPC, "-o", "test/mock/compost_mock_ppc", "test/mock/main.c", "test/compost.c", "test/protocol_impl.c"])
 
 
 @target("Checking mock (PowerPC)", {mock_powerpc})
 def mock_powerpc_check():
-    run(["echo", '"00 01 02 03" | xxd -r -p | qemu-ppc ./mock/compost_mock_ppc > /dev/null"'], shell=True)
+    run(['echo "00 01 02 03" | xxd -r -p | qemu-ppc ./test/mock/compost_mock_ppc > /dev/null'], shell=True)
 
 
 @target("Testing Python with mock (PowerPC)", {mock_powerpc, mock_powerpc_check})
 def mock_powerpc_test():
-    run([PYTHON, "test_compost.py", "--mock", "qemu-ppc ./mock/compost_mock_ppc", "--log-cli-level", "DEBUG"])
+    run([PYTHON, "test/test_compost.py", "--mock", "qemu-ppc ./test/mock/compost_mock_ppc", "--log-cli-level", "DEBUG"])
 
 
 @target("Checking mock (sanitized)", {mock_sanitized})
 def mock_sanitized_check():
-    run(["echo", '"00 01 02 03" | xxd -r -p | ./mock/compost_mock > /dev/null"'], shell=True)
+    run(['echo "00 01 02 03" | xxd -r -p | ./test/mock/compost_mock > /dev/null'], shell=True)
 
 
 @target("Testing Python with mock (sanitized)", {mock_sanitized, mock_sanitized_check})
 def mock_sanitized_test():
-    run([PYTHON, "test_compost.py", "--mock", "./mock/compost_mock", "--log-cli-level", "DEBUG"])
+    run([PYTHON, "test/test_compost.py", "--mock", "./test/mock/compost_mock", "--log-cli-level", "DEBUG"])
 
 
 @target()
@@ -220,9 +220,6 @@ if __name__ == "__main__":
     target_kwargs = {}
     if args.target == "release":
         target_kwargs["release_type"] = args.release_type
-
-    # Change current working directory to the script directory
-    os.chdir(sys.path[0] + "/test")
 
     targets[args.target](**target_kwargs)
 
