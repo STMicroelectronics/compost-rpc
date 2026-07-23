@@ -1375,12 +1375,15 @@ class CCodeGenerator(CodeGenerator):
         self._enable_notif_handlers = True
         self._type_prefix = self._protocol_name
         self._fn_prefix = _scase(self._protocol_name, to_upper=False)
+        self._reset()
+
+    def _reset(self) -> None:
         self._enums = _String()
         self._structs = _String()
         self._static_vars = _String()
         self._type_inits = _String()
         self._type_inits_proto = _String()
-        self._type_serdes: dict[str, str] = {}
+        self._type_serdes = {}
 
     @property
     def path(self):
@@ -1671,6 +1674,7 @@ struct {type_name} {type_name}_init({', '.join(init_fn_args) if init_fn_args els
     
     def generate(self, endpoint: Endpoint = Endpoint.REMOTE) -> list[tuple[Path, str]]:
         self._validate_endpoint(endpoint)
+        self._reset()
         self._define_types()
         gen_uuid = uuid.uuid4()
         version_info = f'''#define COMPOST_VERSION "{__version__}"
