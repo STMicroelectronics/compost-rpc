@@ -233,6 +233,8 @@ if __name__ == "__main__":
         gen.force_overwrite = True
         gen.csharp.is_partial = True
         gen.csharp.namespace = "CompostRpc.IntegrationTests"
+        gen.c.type_prefix = ""
+        gen.c.fn_prefix = ""
         gen.c.generate()
         #! This is a temporary hack to allow C# generation, until a proper TWO_WAY support is added    
         TestProtocol._rpcs = {k: x for (k, x) in TestProtocol._rpcs.items() if not x.is_notification or x.direction == CallDirection.TO_LOCAL}
