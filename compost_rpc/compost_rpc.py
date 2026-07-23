@@ -1373,6 +1373,8 @@ class CCodeGenerator(CodeGenerator):
         self._path_source: Path = self.path
         self._path_header: Path = self.path
         self._enable_notif_handlers = True
+        self._type_prefix = self._protocol_name
+        self._fn_prefix = _scase(self._protocol_name, to_upper=False)
         self._enums = _String()
         self._structs = _String()
         self._static_vars = _String()
@@ -1405,7 +1407,23 @@ class CCodeGenerator(CodeGenerator):
     @path_source.setter
     def path_source(self, value: Path):
         self._path_source = value
-    
+
+    @property
+    def fn_prefix(self) -> str:
+        """Prefix to all user defined function names. Defaults to protocol name."""
+        return self._fn_prefix
+    @fn_prefix.setter
+    def fn_prefix(self, value: str):
+        self._fn_prefix = value
+
+    @property
+    def type_prefix(self) -> str:
+        """Prefix to all user defined type names. Defaults to protocol name."""
+        return self._type_prefix
+    @type_prefix.setter
+    def type_prefix(self, value: str):
+        self._type_prefix = value
+
     _primitive_type_map = {
         U8: "uint8_t",
         I8: "int8_t",
@@ -1421,19 +1439,31 @@ class CCodeGenerator(CodeGenerator):
         bytes: "struct CompostSliceU8"
     }
 
-    @classmethod
-    def _type(cls, t: type) -> str:
-        if t in cls._primitive_type_map:
-            return cls._primitive_type_map[t]
+    def _type_name(self, t: type) -> str:
+        return f"{self.type_prefix}{t.__name__}"
+
+    def _type_fn_name(self, t: type, helper: str) -> str:
+        return f"{self._type_name(t)}_{helper}"
+
+    def _rpc_fn_name(self, rpc: Rpc, suffix: str) -> str:
+        prefix = f"{self.fn_prefix}_" if self.fn_prefix else ""
+        return f"{prefix}{rpc.name}_{suffix}"
+
+    def _enum_variant_name(self, t: type[Enum], variant: Enum) -> str:
+        return f"{_scase(self._type_name(t))}_{variant.name.upper()}"
+
+    def _ctype(self, t: type) -> str:
+        if t in self._primitive_type_map:
+            return self._primitive_type_map[t]
         elif get_origin(t) is list:
             inner_type = get_args(t)[0]
             return f"struct CompostSlice{inner_type.__name__}"
         elif _issubclass(t, _CompostStruct):
-            return f"struct {t.__name__}"
-        elif _issubclass(t, BitU):
-            return cls._primitive_type_map[U32]
+            return f"struct {self._type_name(t)}"
         elif _issubclass(t, Enum):
-            return f"enum {t.__name__}"
+            return f"enum {self._type_name(t)}"
+        elif _issubclass(t, BitU):
+            return self._primitive_type_map[U32]
         else:
             raise TypeError("Unsupported type")
 
@@ -1449,37 +1479,35 @@ class CCodeGenerator(CodeGenerator):
                 names.append(member_name)
         return names
 
-    @classmethod
-    def _member_default_value(cls, struct: type, member_annotation: tuple[str, type]) -> str:
+    def _member_default_value(self, struct: type, member_annotation: tuple[str, type]) -> str:
         name, t = member_annotation
         if t in _NUMERIC_PRIMITIVE_TYPES or _issubclass(t, (BitU, )):
             return "0"
         elif _issubclass(t, (str, bytes)):
-            return cls._member_default_value(t, (name, list[U8]))
+            return self._member_default_value(t, (name, list[U8]))
         elif get_origin(t) is list:
             inner_type = get_args(t)[0]
             return f"compost_slice_{inner_type.__name__.lower()}_new(alloc, {name}_len)"
         elif _issubclass(t, _CompostStruct):
             len_names = ["alloc"] if t.dynamic_members else []
-            for x in cls._dynamic_member_names(t):
-                for y in cls._dynamic_member_names(struct):
+            for x in self._dynamic_member_names(t):
+                for y in self._dynamic_member_names(struct):
                     if y.endswith(x):
                         len_names.append(f"{y}_len")
                         break
-            return f"{t.__name__}_init({', '.join(len_names)})"
+            return f"{self._type_fn_name(t, 'init')}({', '.join(len_names)})"
         elif _issubclass(t, Enum):
-            return f"{_scase(t.__name__)}_{list(t)[0].name}"
+            return self._enum_variant_name(t, list(t)[0])
         else:
             raise TypeError("Unsupported type")
 
-    @classmethod
-    def _handler_signature(cls, rpc: Rpc, as_caller: bool = False) -> _String:
+    def _handler_signature(self, rpc: Rpc, as_caller: bool = False) -> _String:
         sig = rpc.call_sig
         call_site_params = []
         prototype_params = []
         parameters_items = rpc.get_param_items()
         for name, typ in parameters_items:
-            prototype_params.append(f"{cls._type(typ.annotation)} {name}")
+            prototype_params.append(f"{self._ctype(typ.annotation)} {name}")
             call_site_params.append(f"l_{name}")
         if sig.return_annotation is sig.empty:
             return_type = "void"
@@ -1489,10 +1517,11 @@ class CCodeGenerator(CodeGenerator):
             if _is_type_dynamic(sig.return_annotation):
                 prototype_params.append("struct CompostAlloc *alloc")
                 call_site_params.append("&alloc")
-            return_type = cls._type(sig.return_annotation)
+            return_type = self._ctype(sig.return_annotation)
         result_assignment = f"{return_type} ret = " if return_type != "void" else ""
-        call_site = f"{result_assignment}{rpc.name}_handler({', '.join(call_site_params)});"
-        prototype = f"{return_type} {rpc.name}_handler({', '.join(prototype_params) if prototype_params else 'void'});"
+        handler_name = self._rpc_fn_name(rpc, "handler")
+        call_site = f"{result_assignment}{handler_name}({', '.join(call_site_params)});"
+        prototype = f"{return_type} {handler_name}({', '.join(prototype_params) if prototype_params else 'void'});"
         return _String(call_site if as_caller else prototype)
 
     def _define_type_helper(self, t: type, helper: str) -> None:
@@ -1502,29 +1531,30 @@ class CCodeGenerator(CodeGenerator):
         if helper == "init":
             t_dynamic_members = self._dynamic_member_names(t)
             init_fn_args = [f'uint16_t {x}_len' for x in t_dynamic_members]
+            type_name = self._type_name(t)
 
             # alloc_init generation
             if t.dynamic_members:
                 suffixes = [x.bytes for x in t.layout[1:]]
                 init_fn_args.insert(0, "struct CompostAlloc *alloc")
-                self._type_inits_proto += f"struct CompostAlloc {t.__name__}_alloc_init(uint8_t *tx_buf, uint16_t tx_buf_len);\n"
-                self._static_vars += f"static uint16_t {t.__name__}_alloc_suffixes[{len(suffixes)}] = {{{', '.join([str(x) for x in suffixes])}}};\n"
+                self._type_inits_proto += f"struct CompostAlloc {type_name}_alloc_init(uint8_t *tx_buf, uint16_t tx_buf_len);\n"
+                self._static_vars += f"static uint16_t {type_name}_alloc_suffixes[{len(suffixes)}] = {{{', '.join([str(x) for x in suffixes])}}};\n"
                 self._type_inits += f"""
-struct CompostAlloc {t.__name__}_alloc_init(uint8_t *tx_buf, uint16_t tx_buf_len)
+struct CompostAlloc {type_name}_alloc_init(uint8_t *tx_buf, uint16_t tx_buf_len)
 {{
     struct CompostAlloc alloc = compost_alloc_init(tx_buf + 4 + {t.layout[0].bytes}, tx_buf_len);
-    compost_alloc_set_suffixes(&alloc, {t.__name__}_alloc_suffixes, {len(suffixes)});
+    compost_alloc_set_suffixes(&alloc, {type_name}_alloc_suffixes, {len(suffixes)});
     return alloc;
 }}
 """
             # init generation
-            self._type_inits_proto += f"{self._type(t)} {t.__name__}_init({', '.join(init_fn_args) if init_fn_args else 'void'});\n\n"
+            self._type_inits_proto += f"{self._ctype(t)} {type_name}_init({', '.join(init_fn_args) if init_fn_args else 'void'});\n\n"
             init_fn_member_init = [f".{member[0]} = {self._member_default_value(t, member)}" for member in t.__annotations__.items()]
             init_fn_member_init = ',\n        '.join(init_fn_member_init)
             self._type_inits += f"""
-struct {t.__name__} {t.__name__}_init({', '.join(init_fn_args) if init_fn_args else 'void'})
+struct {type_name} {type_name}_init({', '.join(init_fn_args) if init_fn_args else 'void'})
 {{
-    return (struct {t.__name__}){{
+    return (struct {type_name}){{
         {init_fn_member_init}
     }};
 }}
@@ -1533,11 +1563,11 @@ struct {t.__name__} {t.__name__}_init({', '.join(init_fn_args) if init_fn_args e
             is_store = helper == "store"
             fn = self._serdes_fn(t, helper)
             # load
-            fn_proto = f"{self._type(t)} {fn}(const uint8_t ** src)"
+            fn_proto = f"{self._ctype(t)} {fn}(const uint8_t ** src)"
             fn_call = self._load_call
             iter_ptr = "src"
             if is_store: #store
-                fn_proto = f"void {fn}(uint8_t** dest, {self._type(t)}* src)"
+                fn_proto = f"void {fn}(uint8_t** dest, {self._ctype(t)}* src)"
                 fn_call = self._store_call
                 iter_ptr = "dest"
             code = _String(indent=0)
@@ -1547,7 +1577,7 @@ struct {t.__name__} {t.__name__}_init({', '.join(init_fn_args) if init_fn_args e
             ))
             code.indent_inc()
             if not is_store:
-                code.add((f"struct {t.__name__} ret;"))
+                code.add((f"{self._ctype(t)} ret;"))
             offset = MemUnit()
             for member_name, member_t in t.__annotations__.items():
                 member_path = f"src->{member_name}" if is_store else f"ret.{member_name}"
@@ -1572,14 +1602,14 @@ struct {t.__name__} {t.__name__}_init({', '.join(init_fn_args) if init_fn_args e
     def _define_types(self) -> None:
         for t in _CUSTOM_USER_TYPES:
             if _issubclass(t, _CompostStruct):
-                self._structs += f"\n\nstruct {t.__name__} {{\n"
+                self._structs += f"\n\n{self._ctype(t)} {{\n"
                 for member in t.__annotations__.items():
                     member_name, member_t = member
                     if _issubclass(member_t, (BitU, )):
-                        self._structs += f"    {self._type(member_t)} {member_name} : {member_t.size.bits};\n"
+                        self._structs += f"    {self._ctype(member_t)} {member_name} : {member_t.size.bits};\n"
                     else:
                         try:
-                            self._structs += f"    {self._type(member_t)} {member_name};\n"
+                            self._structs += f"    {self._ctype(member_t)} {member_name};\n"
                         except TypeError:
                             #rethrow with more specific error message
                             raise TypeError(f'Unsupported type of compost_struct attribute "{member_name}": {member_t.__name__}')
@@ -1588,8 +1618,8 @@ struct {t.__name__} {t.__name__}_init({', '.join(init_fn_args) if init_fn_args e
             elif _issubclass(t, Enum):
                 sep = ",\n"
                 self._enums += f"""
-enum {t.__name__} {{
-{sep.join(f"    {_scase(t.__name__)}_{variant.name.upper()} = {variant.value}" for variant in t)}
+{self._ctype(t)} {{
+{sep.join(f"    {self._enum_variant_name(t, variant)} = {variant.value}" for variant in t)}
 }};
 """
 
@@ -1608,7 +1638,7 @@ enum {t.__name__} {{
         elif _issubclass(t, BitU):
             fn = f"compost_bituint_{suffix}"
         elif _issubclass(t, _CompostStruct):
-            fn = f"{t.__name__}_{suffix}"
+            fn = self._type_fn_name(t, suffix)
         else:
             raise TypeError(f"No dedicated {suffix} function exists for specified type")
         return fn
@@ -1629,7 +1659,7 @@ enum {t.__name__} {{
             self._define_type_helper(t, "load")
         args = [src]
         args.extend([str(x) for x in extra_args])
-        return f"{'' if '.' in dest else f'{self._type(t)} '}{dest} = {fn_name}({', '.join(args)});"
+        return f"{'' if '.' in dest else f'{self._ctype(t)} '}{dest} = {fn_name}({', '.join(args)});"
 
     @staticmethod
     def _byte_align(code: _String, offset: MemUnit, ptr: str) -> tuple[_String, MemUnit]:
@@ -1675,18 +1705,19 @@ enum RpcId {{
         for notif in self._protocol._rpcs.values():
             if not notif.is_notification or not endpoint.is_call_outbound(notif):
                 continue
-            params = [f"{self._type(param_type.annotation)} {param_name}" for param_name, param_type in notif.get_param_items()]
+            params = [f"{self._ctype(param_type.annotation)} {param_name}" for param_name, param_type in notif.get_param_items()]
             params = ", " + ", ".join(params) if params else ""
+            serializer_name = self._rpc_fn_name(notif, "store")
             protocol_header += f"""
 /**
  * {notif.__doc__}
  */
-size_t {notif.name}_store(uint8_t *tx_buf{params});
+size_t {serializer_name}(uint8_t *tx_buf{params});
 """
             protocol_source += f"""/**
 * Serialization function for {notif.name} notification
 */
-size_t {notif.name}_store(uint8_t *tx_buf{params})
+size_t {serializer_name}(uint8_t *tx_buf{params})
 {{
     struct CompostMsg tx = {{
         .header = {{ .txn = 0 }},
@@ -1745,7 +1776,7 @@ void invoke_{rpc.name}({", ".join(invoke_params)})
             elif _issubclass(sig.return_annotation, _CompostStruct):
                 if sig.return_annotation.dynamic_members:
                     invoke_fn.add((
-                        f"struct CompostAlloc alloc = {sig.return_annotation.__name__}_alloc_init(tx->payload_buf + {sig.return_annotation.layout[0].bytes}, tx->payload_buf_size - {sig.return_annotation.layout[0].bytes});",
+                        f"struct CompostAlloc alloc = {self._type_fn_name(sig.return_annotation, 'alloc_init')}(tx->payload_buf + {sig.return_annotation.layout[0].bytes}, tx->payload_buf_size - {sig.return_annotation.layout[0].bytes});",
                     ))
             invoke_fn.add(f"{self._handler_signature(rpc, as_caller=True)}")
             if sig.return_annotation is not Signature.empty:
