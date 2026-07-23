@@ -107,7 +107,7 @@ def release(release_type: str):
     replace_line("compost_rpc/compost_rpc.py", r'^__version__\s*=.*$', f'__version__ = "{new_version}"')
 
     run(["git", "add", "compost_rpc/compost_rpc.py", "pyproject.toml"])
-    run(["git", "commit", "-m", f"chore: Release version {new_version}"])
+    run(["git", "commit", "-m", f"Release version {new_version}"])
     run(["git", "tag", f"v{new_version}"])
 
     print(f"Created release commit for version {new_version}.")
