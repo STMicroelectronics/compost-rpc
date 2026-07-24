@@ -118,6 +118,19 @@ public static class Serialization
         return true;
     }
 
+    private static BufferUnit GetCompostStructSize(Type type, Func<PropertyInfo, BufferUnit> getPropertySize)
+    {
+        BufferUnit size = BufferUnit.Zero;
+        foreach (var property in GetCompostStructProperties(type))
+        {
+            if (property.PackedSize is not null)
+                size += property.PackedSize.Value;
+            else
+                size = size.AlignToBytes() + getPropertySize(property.ReflectionInfo);
+        }
+        return size.AlignToBytes();
+    }
+
     /// <summary>
     /// Get size of representation in a compost protocol for Type
     /// </summary>
@@ -145,13 +158,7 @@ public static class Serialization
         }
         else if (IsTypeCompostStruct(type))
         {
-            BufferUnit classSize = new(0);
-            var properties = GetCompostStructProperties(type);
-            foreach (var property in properties)
-                if (property.PackedSize is not null)
-                    classSize += property.PackedSize.Value;
-                else
-                    classSize += GetTypeSize(property.ReflectionInfo.PropertyType);
+            BufferUnit classSize = GetCompostStructSize(type, property => GetTypeSize(property.PropertyType));
             _typeSizeCache.TryAdd(type, classSize);
             return classSize;
         }
@@ -185,13 +192,7 @@ public static class Serialization
         }
         else if (IsTypeCompostStruct(argType) && !IsTypeStatic(argType))
         {
-            BufferUnit classSize = new(0);
-            foreach (var property in GetCompostStructProperties(argType))
-                if (property.PackedSize is not null)
-                    classSize += property.PackedSize.Value;
-                else
-                    classSize += GetObjectSize(property.ReflectionInfo.GetValue(arg, null));
-            return classSize;
+            return GetCompostStructSize(argType, property => GetObjectSize(property.GetValue(arg, null)));
         }
         else
             return GetTypeSize(argType);
@@ -425,6 +426,7 @@ public static class Serialization
     /// </param>
     public static void Serialize(object arg, byte[] buffer, ref BufferUnit offset)
     {
+        offset = offset.AlignToBytes();
         Type argType = arg?.GetType() ?? throw new ArgumentNullException(nameof(arg));
         if (argType.IsEnum)
         {
@@ -460,6 +462,7 @@ public static class Serialization
         }
         else
             SerializePrimitive(arg, buffer, ref offset);
+        offset = offset.AlignToBytes();
     }
 
     /// <inheritdoc cref="Serialize"/>
@@ -509,6 +512,7 @@ public static class Serialization
     /// <param name="argType">Type of object to deserialize</param>
     public static object Deserialize(Type argType, ReadOnlySpan<byte> buffer, ref BufferUnit offset)
     {
+        offset = offset.AlignToBytes();
         object arg;
         if (argType.IsEnum)
         {
@@ -559,6 +563,7 @@ public static class Serialization
         {
             arg = DeserializePrimitive(argType, buffer, ref offset);
         }
+        offset = offset.AlignToBytes();
         return arg;
     }
 
