@@ -171,4 +171,14 @@ public partial class TestProtocol(ITransport transport) : Protocol(transport)
         add => AddNotificationHandler(value);
         remove => RemoveNotificationHandler(value);
     }
+
+    /// <summary>
+    /// Sends struct with bitfields
+    /// </summary>
+    [Notification(0xe04)]
+    public event Action<BitfieldStruct, NestedBitfieldStruct> NotifyBitfields
+    {
+        add => AddNotificationHandler(value);
+        remove => RemoveNotificationHandler(value);
+    }
 }

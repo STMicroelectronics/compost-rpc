@@ -54,25 +54,33 @@ public enum Voltages : int
 public class BitfieldStruct
 {
     [Pack(8)]
-    public int Channel { get; set; }
+    public uint Channel { get; set; }
     [Pack(5)]
-    public int Inom { get; set; }
+    public uint Inom { get; set; }
     [Pack(4)]
-    public int Hsc { get; set; }
+    public uint Hsc { get; set; }
     [Pack(9)]
-    public int Tnom { get; set; }
+    public uint Tnom { get; set; }
     [Pack(4)]
     public Voltages Temp { get; set; }
     [Pack(3)]
-    public int Ststart { get; set; }
+    public uint Ststart { get; set; }
     [Pack(1)]
-    public int Ccm { get; set; }
+    public uint Ccm { get; set; }
     [Pack(1)]
-    public int Set { get; set; }
+    public uint Set { get; set; }
     [Pack(1)]
-    public int State { get; set; }
+    public uint State { get; set; }
     [Pack(1)]
-    public int Clear { get; set; }
+    public uint Clear { get; set; }
+}
+
+public class NestedBitfieldStruct
+{
+    [Pack(1)]
+    public uint Leading { get; set; }
+    public BitfieldStruct Fields { get; set; } = new();
+    public Status Status { get; set; }
 }
 
 public class ListFirstAttr
@@ -133,7 +141,7 @@ public class MockLogMessage
 {
     public Status Severity { get; set; }
     public string Message { get; set; } = string.Empty;
-    public MockDate Timestamp { get; set; } = new ();
+    public MockDate Timestamp { get; set; } = new();
     public byte ByteXor { get; set; }
 }
 
@@ -141,5 +149,5 @@ public class MockLfsr
 {
     public ulong Polynomial { get; set; }
     public ulong Value { get; set; }
-    public MockDate Timestamp { get; set; } = new ();
+    public MockDate Timestamp { get; set; } = new();
 }

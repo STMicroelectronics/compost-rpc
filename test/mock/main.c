@@ -126,8 +126,35 @@ int main(int argc, char *argv[])
             tx_len = notify_heartbeat_store(tx_buf);
             break;
         case 0x0e03:
-            tx_len = notify_bitwise_complement_store(tx_buf, 0xAAAAAAAAAAAAAAAA, 0x5555555555555555);
+            tx_len =
+                notify_bitwise_complement_store(tx_buf, 0xAAAAAAAAAAAAAAAA, 0x5555555555555555);
             break;
+        case 0x0e04: {
+            struct BitfieldStruct a = {.channel = 0,
+                                       .inom = 1,
+                                       .hsc = 0,
+                                       .tnom = 1,
+                                       .temp = VOLTAGES_MV_110_92,
+                                       .ststart = 1,
+                                       .ccm = 0,
+                                       .set = 1,
+                                       .state = 0,
+                                       .clear = 1};
+            struct NestedBitfieldStruct b = {.leading = 1,
+                                             .fields = {.channel = 0xA5,
+                                                        .inom = 0x12,
+                                                        .hsc = 0x9,
+                                                        .tnom = 0x155,
+                                                        .temp = VOLTAGES_MV_63_08,
+                                                        .ststart = 0x5,
+                                                        .ccm = 1,
+                                                        .set = 0,
+                                                        .state = 1,
+                                                        .clear = 0},
+                                             .status = STATUS_WARN};
+            tx_len = notify_bitfields_store(tx_buf, a, b);
+            break;
+        }
         default:
             notif_requested = false;
             break;
