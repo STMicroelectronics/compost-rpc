@@ -11,7 +11,7 @@ import typing
 import uuid
 import socket
 from string import Template
-from dataclasses import dataclass, astuple
+from dataclasses import dataclass
 from queue import Queue, Empty
 from pathlib import Path
 from datetime import datetime
@@ -585,8 +585,8 @@ def pack_payload(types: list[type], *args) -> bytes:
     def _pack(buffer: memoryview, offset: MemUnit, t: type, value) -> MemUnit:
         if _issubclass(t, (_CompostStruct, )):
             offset.byte_align()
-            for (_, member_type), member in zip(t.__annotations__.items(), astuple(value)):
-                offset = _pack(buffer, offset, member_type, member)
+            for member_name, member_type in t.__annotations__.items():
+                offset = _pack(buffer, offset, member_type, getattr(value, member_name))
         elif _issubclass(t, (bytes, str)):
             offset.byte_align()
             if _issubclass(t, (str,)):
