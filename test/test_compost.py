@@ -6,7 +6,7 @@ from time import sleep, time
 from pathlib import Path
 import argparse
 import protocol_def
-from protocol_def import compost_rpc, MockDate, MotorState, MotorDirection, MockMotorControl, MockMotorReport, BitfieldStruct, Voltages, ListFirstAttr
+from protocol_def import compost_rpc, MockDate, MotorState, MotorDirection, MockMotorControl, MockMotorReport, BitfieldStruct, NestedBitfieldStruct, Status, Voltages, ListFirstAttr
 
 # Get default command to run mock from environment, otherwise use the hardcoded command
 mock_path = os.environ.get('COMPOST_MOCK_PATH')
@@ -131,28 +131,36 @@ def test_floats():
 
 def test_bitints():
     q = Queue()
-    config = BitfieldStruct(channel=0,inom=1,hsc=0,tnom=1,temp=0,ststart=1,ccm=0,set=1,state=0,clear=1)
+    a = BitfieldStruct(channel=0,inom=1,hsc=0,tnom=1,temp=0,ststart=1,ccm=0,set=1,state=0,clear=1)
+    b = NestedBitfieldStruct(
+        leading=1,
+        fields=BitfieldStruct(channel=0xA5, inom=0x12, hsc=0x9, tnom=0x155, temp=Voltages.MV_63_08, ststart=0x5, ccm=1, set=0, state=1, clear=0),
+        status=Status.WARN,
+    )
     
-    def bitfield_handler(payload: BitfieldStruct):
-        q.put(payload)
+    def bitfield_handler(payload_a: BitfieldStruct, payload_b: NestedBitfieldStruct):
+        q.put((payload_a, payload_b))
 
     rpc.notify_bitfields.subscribe(bitfield_handler)
-    rpc.notify_bitfields(config)
+    rpc.notify_bitfields(a, b)
     sleep(0.1)
 
-    payload = q.get()
-    print(f"{config=}")
-    print(f"{payload=}")
-    assert ~config.channel & ((1 << 8) - 1) == payload.channel
-    assert ~config.inom & ((1 << 5) - 1) == payload.inom
-    assert ~config.hsc & ((1 << 4) - 1) == payload.hsc
-    assert ~config.tnom & ((1 << 9) - 1) == payload.tnom
-    assert Voltages.MV_37_50 == payload.temp
-    assert ~config.ststart & ((1 << 3) - 1) == payload.ststart
-    assert ~config.ccm & ((1 << 1) - 1) == payload.ccm
-    assert ~config.set & ((1 << 1) - 1) == payload.set
-    assert ~config.state & ((1 << 1) - 1) == payload.state
-    assert ~config.clear & ((1 << 1) - 1) == payload.clear
+    payload_a, payload_b = q.get()
+    print(f"{a=}")
+    print(f"{payload_a=}")
+    print(f"{b=}")
+    print(f"{payload_b=}")
+    assert ~a.channel & ((1 << 8) - 1) == payload_a.channel
+    assert ~a.inom & ((1 << 5) - 1) == payload_a.inom
+    assert ~a.hsc & ((1 << 4) - 1) == payload_a.hsc
+    assert ~a.tnom & ((1 << 9) - 1) == payload_a.tnom
+    assert Voltages.MV_37_50 == payload_a.temp
+    assert ~a.ststart & ((1 << 3) - 1) == payload_a.ststart
+    assert ~a.ccm & ((1 << 1) - 1) == payload_a.ccm
+    assert ~a.set & ((1 << 1) - 1) == payload_a.set
+    assert ~a.state & ((1 << 1) - 1) == payload_a.state
+    assert ~a.clear & ((1 << 1) - 1) == payload_a.clear
+    assert b == payload_b
 
 def test_nested_structs():
     current_epoch = int(time())

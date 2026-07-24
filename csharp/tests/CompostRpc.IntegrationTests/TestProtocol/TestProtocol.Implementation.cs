@@ -15,15 +15,23 @@ public partial class TestProtocol : Protocol
     [Rpc(0x222)]
     public Task<uint> AddIntUnimplementedAsync(uint a, uint b)
         => InvokeRpcAsync<uint>([a, b]);
-    
+
     [RpcImplementation(nameof(TriggerNotificationAsync))]
-    public void TriggerNotificationImpl (ushort rpcId)
+    public void TriggerNotificationImpl(ushort rpcId)
     {
-        object[]? data = rpcId switch 
+        object[]? data = rpcId switch
         {
             0xe00 => [EpochToDateImpl((int)DateTimeOffset.Now.ToUnixTimeSeconds())],
             0xe02 => [true],
             0xe03 => [0xAAAAAAAAAAAAAAAA, 0x5555555555555555],
+            0xe04 => [
+                new BitfieldStruct { Channel = 0, Inom = 1, Hsc = 0, Tnom = 1, Temp = Voltages.Mv110_92, Ststart = 1, Ccm = 0, Set = 1, State = 0, Clear = 1 },
+                new NestedBitfieldStruct {
+                    Leading = 1,
+                    Fields = new BitfieldStruct { Channel = 0xA5, Inom = 0x12, Hsc = 0x9, Tnom = 0x155, Temp = Voltages.Mv63_08, Ststart = 0x5, Ccm = 1, Set = 0, State = 1, Clear = 0 },
+                    Status = Status.Warn
+                }
+            ],
             _ => throw new NotImplementedException($"Trigger for {rpcId} not defined.")
         };
         ITransport? _baseTransport = (ITransport?)BaseSession?.GetType().GetField("_transport", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(BaseSession);
@@ -61,7 +69,7 @@ public partial class TestProtocol : Protocol
     [RpcImplementation(nameof(DivideFloatAsync))]
     public static float DivideFloatImpl(float a, float b)
     {
-        return a/b;
+        return a / b;
     }
 
     [RpcImplementation(nameof(CaesarCipherAsync))]
@@ -78,7 +86,7 @@ public partial class TestProtocol : Protocol
         return data;
     }
 
-    private static T CalculateMinMax<T> (List<short> data) where T : new()
+    private static T CalculateMinMax<T>(List<short> data) where T : new()
     {
         T ret = new();
         var retType = typeof(T);
@@ -89,25 +97,25 @@ public partial class TestProtocol : Protocol
     }
 
     [RpcImplementation(nameof(ListFirstAttrAsync))]
-    public static ListFirstAttr ListFirstAttrImpl (List<short> data)
+    public static ListFirstAttr ListFirstAttrImpl(List<short> data)
     {
         return CalculateMinMax<ListFirstAttr>(data);
     }
 
     [RpcImplementation(nameof(ListMidAttrAsync))]
-    public static ListMidAttr ListMidAttrImpl (List<short> data)
+    public static ListMidAttr ListMidAttrImpl(List<short> data)
     {
         return CalculateMinMax<ListMidAttr>(data);
     }
 
     [RpcImplementation(nameof(ListLastAttrAsync))]
-    public static ListLastAttr ListLastAttrImpl (List<short> data)
+    public static ListLastAttr ListLastAttrImpl(List<short> data)
     {
         return CalculateMinMax<ListLastAttr>(data);
     }
 
     [RpcImplementation(nameof(TwoListAttrAsync))]
-    public static TwoListAttr TwoListAttrImpl (List<short> data_a, List<short> data_b)
+    public static TwoListAttr TwoListAttrImpl(List<short> data_a, List<short> data_b)
     {
         return new TwoListAttr()
         {
@@ -118,9 +126,9 @@ public partial class TestProtocol : Protocol
             DataB = data_b
         };
     }
-    
+
     [RpcImplementation(nameof(EpochToDateAsync))]
-    public static MockDate EpochToDateImpl (int epoch)
+    public static MockDate EpochToDateImpl(int epoch)
     {
         var dt = DateTimeOffset.FromUnixTimeSeconds(epoch);
         MockDate ret = new()

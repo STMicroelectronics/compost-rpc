@@ -56,4 +56,29 @@ public abstract class NotificationTestsBase
         ulong b = await FetchNotificationArg<ulong>();
         Assert.True(a == ~b);
     }
+
+    [Fact]
+    public async Task NotifyNestedBitfieldsByTriggerRpcTest()
+    {
+        _unit.NotifyBitfields += (a, b) => _notificationArgs.Post((a, b));
+        await _unit.TriggerNotificationAsync(0xe04);
+
+        (BitfieldStruct a, NestedBitfieldStruct b) = await FetchNotificationArg<(BitfieldStruct, NestedBitfieldStruct)>();
+        Assert.Equal(0U, a.Channel);
+        Assert.Equal(1U, a.Inom);
+        Assert.Equal(1U, a.Tnom);
+        Assert.Equal(Voltages.Mv110_92, a.Temp);
+        Assert.Equal(1U, b.Leading);
+        Assert.Equal(0xA5U, b.Fields.Channel);
+        Assert.Equal(0x12U, b.Fields.Inom);
+        Assert.Equal(0x9U, b.Fields.Hsc);
+        Assert.Equal(0x155U, b.Fields.Tnom);
+        Assert.Equal(Voltages.Mv63_08, b.Fields.Temp);
+        Assert.Equal(0x5U, b.Fields.Ststart);
+        Assert.Equal(1U, b.Fields.Ccm);
+        Assert.Equal(0U, b.Fields.Set);
+        Assert.Equal(1U, b.Fields.State);
+        Assert.Equal(0U, b.Fields.Clear);
+        Assert.Equal(Status.Warn, b.Status);
+    }
 }

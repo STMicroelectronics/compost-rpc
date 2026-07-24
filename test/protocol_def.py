@@ -64,6 +64,12 @@ class BitfieldStruct:
     clear:   BitU[1]
 
 @struct
+class NestedBitfieldStruct:
+    leading: BitU[1]
+    fields: BitfieldStruct
+    status: Status
+
+@struct
 class ListFirstAttr:
     data: list[I16]
     min: I16
@@ -215,7 +221,7 @@ class TestProtocol(Protocol):
         """Notifies a value and its bitwise complement."""
 
     @notification(0xE04, direction=CallDirection.TWO_WAY)
-    def notify_bitfields(self, config: BitfieldStruct):
+    def notify_bitfields(self, a: BitfieldStruct, b: NestedBitfieldStruct):
         """Sends struct with bitfields"""
 
     @notification(0xE05, direction=CallDirection.TWO_WAY)
