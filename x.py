@@ -180,6 +180,12 @@ def mock_sanitized_test():
     run([PYTHON, "test/test_compost.py", "--mock", "./test/mock/compost_mock", "--log-cli-level", "DEBUG"])
 
 
+@target("Testing compilation of the example")
+def example_compilation_test():
+    run([PYTHON, "examples/pc_to_pc/protocol_def.py"])
+    run([CC, "-o", "examples/pc_to_pc/server", "-Iexamples/pc_to_pc/", "examples/pc_to_pc/main.c", "examples/pc_to_pc/compost.c"])
+
+
 @target()
 def test():
     if platform.system() == "Linux":
@@ -187,6 +193,7 @@ def test():
         mock_test()
         slices_powerpc_test()
         mock_powerpc_test()
+        example_compilation_test()
     else:
         slices_test()
         mock_test()

@@ -16,4 +16,5 @@ class SimpleProtocol(Protocol):
 
 if __name__ == "__main__":
     with Generator(SimpleProtocol) as gen:
+        gen.force_overwrite = True
         gen.c.generate()
