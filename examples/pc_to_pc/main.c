@@ -22,7 +22,7 @@ uint8_t tx_buf[1024]; // Buffer for the incoming request
 uint8_t rx_buf[1024]; // Buffer for the outgoing response
 
 // This function is called when a message with the "add_int" request is received
-uint32_t add_int_handler(uint32_t a, uint32_t b)
+uint32_t simple_protocol_add_int_handler(uint32_t a, uint32_t b)
 {
     printf("add_int(%d, %d) -> %d\n", a, b, a + b);
     return a + b;
@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
     }
 
     if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2) {
-        fprintf(stderr, "Versiion 2.2 of Winsock is not available.\n");
+        fprintf(stderr, "Version 2.2 of Winsock is not available.\n");
         WSACleanup();
         exit(2);
     }
