@@ -22,8 +22,9 @@ uint8_t tx_buf[1024]; // Buffer for the incoming request
 uint8_t rx_buf[1024]; // Buffer for the outgoing response
 
 // This function is called when a message with the "add_int" request is received
-uint32_t simple_protocol_add_int_handler(uint32_t a, uint32_t b)
+uint32_t simple_protocol_add_int_handler(struct CompostCtx *ctx, uint32_t a, uint32_t b)
 {
+    (void)ctx;
     printf("add_int(%d, %d) -> %d\n", a, b, a + b);
     return a + b;
 }
