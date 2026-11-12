@@ -26,6 +26,9 @@ uv.lock
 
 # Sphinx documentation
 docs/_build/
+docs/build*/
+docs/.doctrees/
+docs/.sphinx-warnings.txt
 
 # Doxygen
 docs/_doxygen/xml/
@@ -100,3 +103,7 @@ test/*.cs
 test/*.rs
 test/mock/compost_mock
 test/mock/compost_mock_ppc
+
+examples/pc_to_pc/compost.c
+examples/pc_to_pc/compost.h
+examples/pc_to_pc/server
