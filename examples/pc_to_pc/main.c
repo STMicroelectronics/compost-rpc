@@ -33,9 +33,9 @@ uint32_t simple_protocol_add_int_handler(struct CompostCtx *ctx, uint32_t a, uin
 int read_bytes(int fd, void *buf, size_t count)
 {
 #ifdef _WIN32
-    recv(fd, buf, count, 0);
+    return recv(fd, buf, count, 0);
 #else
-    read(fd, buf, count);
+    return read(fd, buf, count);
 #endif
 }
 
@@ -43,9 +43,9 @@ int read_bytes(int fd, void *buf, size_t count)
 int write_bytes(int fd, const void *buf, size_t count)
 {
 #ifdef _WIN32
-    send(fd, buf, count, 0);
+    return send(fd, buf, count, 0);
 #else
-    write(fd, buf, count);
+    return write(fd, buf, count);
 #endif
 }
 
