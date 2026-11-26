@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
                 notify_bitwise_complement_store(tx_buf, 0xAAAAAAAAAAAAAAAA, 0x5555555555555555);
             break;
         case 0x0e04: {
-            struct BitfieldStruct a = {.channel = 0,
+            struct BitIntStruct a = {.channel = 0,
                                        .inom = 1,
                                        .hsc = 0,
                                        .tnom = 1,
@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
                                        .set = 1,
                                        .state = 0,
                                        .clear = 1};
-            struct NestedBitfieldStruct b = {.leading = 1,
+            struct NestedBitIntStruct b = {.leading = 1,
                                              .fields = {.channel = 0xA5,
                                                         .inom = 0x12,
                                                         .hsc = 0x9,
@@ -153,7 +153,7 @@ int main(int argc, char *argv[])
                                                         .state = 1,
                                                         .clear = 0},
                                              .status = STATUS_WARN};
-            tx_len = notify_bitfields_store(tx_buf, a, b);
+            tx_len = notify_bitints_store(tx_buf, a, b);
             break;
         }
         default:

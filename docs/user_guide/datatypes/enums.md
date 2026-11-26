@@ -1,17 +1,18 @@
 # Enums
 
-Enums are created with {func}`~compost_rpc.enum` decorator. For a backing
-type, you can choose between signed and unsigned 8-bit integers. Bigger enums
-are not yet supported.
+Enums are created by applying the {func}`~compost_rpc.enum` decorator to an
+`IntEnum` class. Pass the backing type to the decorator: supported backings are
+`I8`, `U8`, `I16`, and `BitU[n]`, where `n` is a bit width from 0 to 32 inclusive.
+The backing alias describes the wire format; it is not a base class.
 
 What you define in protocol_def.py:
 
 ```python
-from enum import Enum
+from enum import IntEnum
 from compost_rpc import U8, enum
 
-@enum
-class Result(U8, Enum):
+@enum(U8)
+class Result(IntEnum):
     OK = 0
     ERR = 1
 ```

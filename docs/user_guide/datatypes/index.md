@@ -11,8 +11,9 @@ This chapter goes through all the features and restrictions.
 
 ## Primitive types
 
-Table below lists all supported primitive Compost types, with the respective
-native type for each supported language.
+Compost has two kinds of numeric scalars: byte-aligned integers and floats,
+and [bit-precise integers](#bit-precise-integers), which start at the current
+bit offset. The table lists the byte-aligned scalars and their native types.
 
 Compost                 | C        | Python | C#     | Description
 -------                 | -------- | ------ | ------ | -----------

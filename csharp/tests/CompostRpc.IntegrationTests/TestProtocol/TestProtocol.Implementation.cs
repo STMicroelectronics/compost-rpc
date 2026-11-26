@@ -25,10 +25,10 @@ public partial class TestProtocol : Protocol
             0xe02 => [true],
             0xe03 => [0xAAAAAAAAAAAAAAAA, 0x5555555555555555],
             0xe04 => [
-                new BitfieldStruct { Channel = 0, Inom = 1, Hsc = 0, Tnom = 1, Temp = Voltages.Mv110_92, Ststart = 1, Ccm = 0, Set = 1, State = 0, Clear = 1 },
-                new NestedBitfieldStruct {
+                new BitIntStruct { Channel = 0, Inom = 1, Hsc = 0, Tnom = 1, Temp = Voltages.Mv110_92, Ststart = 1, Ccm = 0, Set = 1, State = 0, Clear = 1 },
+                new NestedBitIntStruct {
                     Leading = 1,
-                    Fields = new BitfieldStruct { Channel = 0xA5, Inom = 0x12, Hsc = 0x9, Tnom = 0x155, Temp = Voltages.Mv63_08, Ststart = 0x5, Ccm = 1, Set = 0, State = 1, Clear = 0 },
+                    Fields = new BitIntStruct { Channel = 0xA5, Inom = 0x12, Hsc = 0x9, Tnom = 0x155, Temp = Voltages.Mv63_08, Ststart = 0x5, Ccm = 1, Set = 0, State = 1, Clear = 0 },
                     Status = Status.Warn
                 }
             ],

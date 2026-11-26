@@ -173,10 +173,10 @@ public partial class TestProtocol(ITransport transport) : Protocol(transport)
     }
 
     /// <summary>
-    /// Sends struct with bitfields
+    /// Sends structs containing bit-precise integers
     /// </summary>
     [Notification(0xe04)]
-    public event Action<BitfieldStruct, NestedBitfieldStruct> NotifyBitfields
+    public event Action<BitIntStruct, NestedBitIntStruct> NotifyBitints
     {
         add => AddNotificationHandler(value);
         remove => RemoveNotificationHandler(value);

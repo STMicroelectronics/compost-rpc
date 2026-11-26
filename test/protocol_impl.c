@@ -286,7 +286,7 @@ void struct_in_param_handler(struct CompostCtx *ctx, struct ListFirstAttr struct
     assert(structure.max == 10);
 }
 
-void notify_bitfields_handler(struct CompostCtx *ctx, struct BitfieldStruct a, struct NestedBitfieldStruct b)
+void notify_bitints_handler(struct CompostCtx *ctx, struct BitIntStruct a, struct NestedBitIntStruct b)
 {
     (void)ctx;
     a.ccm = ~a.ccm;
@@ -299,7 +299,7 @@ void notify_bitfields_handler(struct CompostCtx *ctx, struct BitfieldStruct a, s
     a.ststart = ~a.ststart;
     a.temp = VOLTAGES_MV_37_50;
     a.tnom = ~a.tnom;
-    uint16_t tx_len = notify_bitfields_store(tx_buf_notif, a, b);
+    uint16_t tx_len = notify_bitints_store(tx_buf_notif, a, b);
 
     fwrite(tx_buf_notif, 1, tx_len, stdout);
     fflush(stdout);

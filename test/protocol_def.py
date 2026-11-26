@@ -4,34 +4,34 @@ from dataclasses import dataclass
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from enum import Enum
+from enum import IntEnum
 import compost_rpc
 from compost_rpc import Protocol, Generator, CallDirection
 from compost_rpc import rpc, enum, struct, notification
 from compost_rpc import I8, U8, I16, U16, I32, U32, F32, U64, BitU
 
 
-@enum
-class Status(U8, Enum):
+@enum(U8)
+class Status(IntEnum):
     OK = 0
     WARN = 1
     ERR = 2
     FAIL = 255
 
-@enum
-class MotorState(I8, Enum):
+@enum(I8)
+class MotorState(IntEnum):
     OFF = 0
     ON = 1
     START = 2
     STOP = 3
 
-@enum
-class MotorDirection(I16, Enum):
+@enum(I16)
+class MotorDirection(IntEnum):
     DOWN = -1000
     UP = 1000
 
-@enum
-class Voltages(BitU[4], Enum):
+@enum(BitU[4])
+class Voltages(IntEnum):
     MV_110_92 = 0
     MV_98_76 = 1
     MV_88_07 = 2
@@ -51,7 +51,7 @@ class Voltages(BitU[4], Enum):
 
 @struct
 @dataclass
-class BitfieldStruct:
+class BitIntStruct:
     channel: BitU[8]
     inom:    BitU[5]
     hsc:     BitU[4]
@@ -64,9 +64,9 @@ class BitfieldStruct:
     clear:   BitU[1]
 
 @struct
-class NestedBitfieldStruct:
+class NestedBitIntStruct:
     leading: BitU[1]
-    fields: BitfieldStruct
+    fields: BitIntStruct
     status: Status
 
 @struct
@@ -221,8 +221,8 @@ class TestProtocol(Protocol):
         """Notifies a value and its bitwise complement."""
 
     @notification(0xE04, direction=CallDirection.TWO_WAY)
-    def notify_bitfields(self, a: BitfieldStruct, b: NestedBitfieldStruct):
-        """Sends struct with bitfields"""
+    def notify_bitints(self, a: BitIntStruct, b: NestedBitIntStruct):
+        """Sends structs containing bit-precise integers"""
 
     @notification(0xE05, direction=CallDirection.TWO_WAY)
     def notify_motor_report(self, report: MockMotorReport):

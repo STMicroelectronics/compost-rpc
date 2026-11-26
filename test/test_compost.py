@@ -6,7 +6,7 @@ from time import sleep, time
 from pathlib import Path
 import argparse
 import protocol_def
-from protocol_def import compost_rpc, MockDate, MotorState, MotorDirection, MockMotorControl, MockMotorReport, BitfieldStruct, NestedBitfieldStruct, Status, Voltages, ListFirstAttr
+from protocol_def import compost_rpc, MockDate, MotorState, MotorDirection, MockMotorControl, MockMotorReport, BitIntStruct, NestedBitIntStruct, Status, Voltages, ListFirstAttr
 
 # Get default command to run mock from environment, otherwise use the hardcoded command
 mock_path = os.environ.get('COMPOST_MOCK_PATH')
@@ -131,18 +131,18 @@ def test_floats():
 
 def test_bitints():
     q = Queue()
-    a = BitfieldStruct(channel=0,inom=1,hsc=0,tnom=1,temp=0,ststart=1,ccm=0,set=1,state=0,clear=1)
-    b = NestedBitfieldStruct(
+    a = BitIntStruct(channel=0,inom=1,hsc=0,tnom=1,temp=0,ststart=1,ccm=0,set=1,state=0,clear=1)
+    b = NestedBitIntStruct(
         leading=1,
-        fields=BitfieldStruct(channel=0xA5, inom=0x12, hsc=0x9, tnom=0x155, temp=Voltages.MV_63_08, ststart=0x5, ccm=1, set=0, state=1, clear=0),
+        fields=BitIntStruct(channel=0xA5, inom=0x12, hsc=0x9, tnom=0x155, temp=Voltages.MV_63_08, ststart=0x5, ccm=1, set=0, state=1, clear=0),
         status=Status.WARN,
     )
     
-    def bitfield_handler(payload_a: BitfieldStruct, payload_b: NestedBitfieldStruct):
+    def bitint_handler(payload_a: BitIntStruct, payload_b: NestedBitIntStruct):
         q.put((payload_a, payload_b))
 
-    rpc.notify_bitfields.subscribe(bitfield_handler)
-    rpc.notify_bitfields(a, b)
+    rpc.notify_bitints.subscribe(bitint_handler)
+    rpc.notify_bitints(a, b)
     sleep(0.1)
 
     payload_a, payload_b = q.get()
