@@ -51,7 +51,7 @@ public enum Voltages : int
     Mv37_50_5 = 15
 };
 
-public class BitfieldStruct
+public class BitIntStruct
 {
     [Pack(8)]
     public uint Channel { get; set; }
@@ -75,11 +75,11 @@ public class BitfieldStruct
     public uint Clear { get; set; }
 }
 
-public class NestedBitfieldStruct
+public class NestedBitIntStruct
 {
     [Pack(1)]
     public uint Leading { get; set; }
-    public BitfieldStruct Fields { get; set; } = new();
+    public BitIntStruct Fields { get; set; } = new();
     public Status Status { get; set; }
 }
 

@@ -16,7 +16,7 @@ from queue import Queue, Empty
 from pathlib import Path
 from datetime import datetime
 from inspect import Parameter, signature, Signature
-from typing import Any, Callable, Concatenate, ParamSpec, TypeVar, runtime_checkable, get_args, get_origin
+from typing import Annotated, Any, Callable, Concatenate, ParamSpec, TypeVar, runtime_checkable, get_args, get_origin
 from abc import ABC, abstractmethod
 from struct import Struct, unpack_from, pack
 from enum import Enum
@@ -127,7 +127,7 @@ def _ccase(arg: str) -> str:
     out = _pcase(arg)
     return "".join([out[0].lower(), *out[1:]]) if len(out) > 1 else out[0].lower()
 
-def _issubclass(cls: Any, class_or_tuple: type | tuple[type]) -> bool:
+def _issubclass(cls: Any, class_or_tuple: type | tuple[type, ...]) -> bool:
     """Custom version of issubclass that does not raise an exception if cls is not a class, but
     returns False."""
     try:
@@ -172,49 +172,30 @@ class MalformedMessageError(RpcError):
     pass
 
 
+@dataclass(frozen=True)
 class MemUnit:
-    """Represents a memory size that can be specified in bits or bytes. Now immutable."""
+    """Memory size expressed in bits or bytes."""
 
+    bits: int = 0
     BITS_PER_BYTE = 8
 
     @classmethod
     def from_bytes(cls, bytes_: int) -> "MemUnit":
         return cls(bits=bytes_ * cls.BITS_PER_BYTE)
 
-    def __init__(self, bits: int = 0):
-        self._bits = bits
-
-    @property
-    def bits(self) -> int:
-        return self._bits
-
-    @bits.setter
-    def bits(self, value: int):
-        self._bits = value
-
     @property
     def bytes(self) -> int:
         return (self.bits + self.BITS_PER_BYTE - 1) // self.BITS_PER_BYTE
 
-    @bytes.setter
-    def bytes(self, value: int):
-        self._bits = value * self.BITS_PER_BYTE
-
-    def byte_align(self):
-        """Aligns the MemUnit to the next byte boundary if not already aligned."""
-        if not self.is_byte_aligned():
-            self._bits = self.bytes * self.BITS_PER_BYTE
+    def byte_align(self) -> "MemUnit":
+        """Return the size rounded up to the next byte boundary."""
+        return self if self.is_byte_aligned() else MemUnit.from_bytes(self.bytes)
 
     def is_byte_aligned(self) -> bool:
-        return (self._bits % self.BITS_PER_BYTE) == 0
+        return (self.bits % self.BITS_PER_BYTE) == 0
 
     def __repr__(self) -> str:
         return f"MemUnit(bits={self.bits}, bytes={self.bytes})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, MemUnit):
-            return NotImplemented
-        return self.bits == other.bits
 
     def __add__(self, other: "MemUnit") -> "MemUnit":
         if not isinstance(other, MemUnit):
@@ -222,291 +203,148 @@ class MemUnit:
         return MemUnit(self.bits + other.bits)
 
 
-class U64(int):
-    """64-bit unsigned integer"""
-
-    size = MemUnit(64)
-    fmt = ">Q"
-
-    def __new__(cls, value, *args, **kwargs):
-        if value < 0:
-            raise ValueError("Unsigned type cannot hold negative value")
-        if value >= 2**64:
-            raise ValueError("Value too large for 64 bit unsigned integer")
-        return super().__new__(cls, value)
-
-    def __str__(self):
-        return "%d" % int(self)
-
-    def __repr__(self):
-        return "U64(%d)" % int(self)
+@dataclass(frozen=True)
+class _ByteAlignedScalarEncoding:
+    size: MemUnit
+    fmt: str
 
 
-class I64(int):
-    """64-bit signed integer"""
+class _ByteAlignedScalar(Enum):
+    """Wire types for byte-aligned scalars."""
 
-    size = MemUnit(64)
-    fmt = ">q"
+    U64 = _ByteAlignedScalarEncoding(MemUnit(64), ">Q")
+    I64 = _ByteAlignedScalarEncoding(MemUnit(64), ">q")
+    U32 = _ByteAlignedScalarEncoding(MemUnit(32), ">I")
+    I32 = _ByteAlignedScalarEncoding(MemUnit(32), ">i")
+    U16 = _ByteAlignedScalarEncoding(MemUnit(16), ">H")
+    I16 = _ByteAlignedScalarEncoding(MemUnit(16), ">h")
+    U8 = _ByteAlignedScalarEncoding(MemUnit(8), ">B")
+    I8 = _ByteAlignedScalarEncoding(MemUnit(8), ">b")
+    F32 = _ByteAlignedScalarEncoding(MemUnit(32), ">f")
+    F64 = _ByteAlignedScalarEncoding(MemUnit(64), ">d")
 
-    def __new__(cls, value, *args, **kwargs):
-        # TODO
-        if value < -(2**64):
-            raise ValueError("Unsigned type cannot hold negative value")
-        if value >= 2**64:
-            raise ValueError("Value too large for 64 bit unsigned integer")
-        return super().__new__(cls, value)
+    @property
+    def size(self) -> MemUnit:
+        return self.value.size
 
-    def __str__(self):
-        return "%d" % int(self)
-
-    def __repr__(self):
-        return "I64(%d)" % int(self)
-
-
-class U32(int):
-    """32-bit unsigned integer"""
-
-    size = MemUnit(32)
-    fmt = ">I"
-
-    def __new__(cls, value, *args, **kwargs):
-        if value < 0:
-            raise ValueError("Unsigned type cannot hold negative value")
-        if value >= 2**32:
-            raise ValueError("Value too large for 32 bit unsigned integer")
-        return super().__new__(cls, value)
-
-    def __str__(self):
-        return "%d" % int(self)
-
-    def __repr__(self):
-        return "U32(%d)" % int(self)
+    @property
+    def fmt(self) -> str:
+        return self.value.fmt
 
 
-class I32(int):
-    """32-bit signed integer"""
+@dataclass(frozen=True)
+class _BitU:
+    """Unsigned integer packed at the current bit offset."""
 
-    size = MemUnit(32)
-    fmt = ">i"
+    size: MemUnit
 
-    def __new__(cls, value, *args, **kwargs):
-        # TODO
-        if value < -(2**31):
-            raise ValueError("Unsigned type cannot hold negative value")
-        if value >= 2**31:
-            raise ValueError("Value too large for 32 bit unsigned integer")
-        return super().__new__(cls, value)
-
-    def __str__(self):
-        return "%d" % int(self)
-
-    def __repr__(self):
-        return "I32(%d)" % int(self)
+    @property
+    def name(self) -> str:
+        return f"BitU[{self.size.bits}]"
 
 
-class U16(int):
-    """16-bit unsigned integer"""
-
-    size = MemUnit(16)
-    fmt = ">H"
-
-    def __new__(cls, value, *args, **kwargs):
-        if value < 0:
-            raise ValueError("Unsigned type cannot hold negative value")
-        if value >= 2**16:
-            raise ValueError("Value too large for 16 bit unsigned integer")
-        return super().__new__(cls, value)
-
-    def __str__(self):
-        return f"{int(self)}"
-
-    def __repr__(self):
-        return f"U16({int(self)})"
+_ScalarType = _ByteAlignedScalar | _BitU
 
 
-class I16(int):
-    """16-bit signed integer"""
-
-    size = MemUnit(16)
-    fmt = ">h"
-
-    def __new__(cls, value, *args, **kwargs):
-        # TODO
-        if value < -(2**15):
-            raise ValueError("Value is less than minimum for 16 bit signed integer")
-        if value >= 2**15:
-            raise ValueError("Value too large for 16 bit signed integer")
-        return super().__new__(cls, value)
-
-    def __str__(self):
-        return f"{int(self)}"
-
-    def __repr__(self):
-        return f"I16({int(self)})"
+U64 = Annotated[int, _ByteAlignedScalar.U64]
+I64 = Annotated[int, _ByteAlignedScalar.I64]
+U32 = Annotated[int, _ByteAlignedScalar.U32]
+I32 = Annotated[int, _ByteAlignedScalar.I32]
+U16 = Annotated[int, _ByteAlignedScalar.U16]
+I16 = Annotated[int, _ByteAlignedScalar.I16]
+U8 = Annotated[int, _ByteAlignedScalar.U8]
+I8 = Annotated[int, _ByteAlignedScalar.I8]
+F32 = Annotated[float, _ByteAlignedScalar.F32]
+F64 = Annotated[float, _ByteAlignedScalar.F64]
 
 
-class U8(int):
-    """8-bit unsigned integer"""
+class BitU:
+    """Bit-precise unsigned integer."""
 
-    size = MemUnit(8)
-    fmt = ">B"
-
-    def __new__(cls, value, *args, **kwargs):
-        if value < 0:
-            raise ValueError("Unsigned type cannot hold negative value")
-        if value >= 2**8:
-            raise ValueError("Value too large for 8 bit unsigned integer")
-        return super().__new__(cls, value)
-
-    def __str__(self):
-        return f"{int(self)}"
-
-    def __repr__(self):
-        return f"U8({int(self)})"
-
-
-class I8(int):
-    """8-bit signed integer"""
-
-    size = MemUnit(8)
-    fmt = ">b"
-
-    def __new__(cls, value, *args, **kwargs):
-        # TODO
-        if value < -(2**7):
-            raise ValueError("Value is less than minimum for 8 bit signed integer")
-        if value >= 2**7:
-            raise ValueError("Value too large for 8 bit signed integer")
-        return super().__new__(cls, value)
-
-    def __str__(self):
-        return f"{int(self)}"
-
-    def __repr__(self):
-        return f"I8({int(self)})"
-
-
-class F32(float):
-    """32-bit floating point number"""
-
-    size = MemUnit(32)
-    fmt = ">f"
-
-    def __new__(cls, value, *args, **kwargs):
-        return super(cls, cls).__new__(cls, value)
-
-    def __str__(self):
-        return f"{float(self)}"
-
-    def __repr__(self):
-        return f"F32({float(self)})"
-
-
-class F64(float):
-    """64-bit floating point number"""
-
-    size = MemUnit(64)
-    fmt = ">d"
-
-    def __new__(cls, value, *args, **kwargs):
-        return super(cls, cls).__new__(cls, value)
-
-    def __str__(self):
-        return f"{float(self)}"
-
-    def __repr__(self):
-        return f"F64({float(self)})"
-
-
-class BitU(int):
-    """Unsigned bit precise integer"""
-
-    size = MemUnit()
-
-    def __class_getitem__(cls, key) -> type["BitU"]:
+    def __class_getitem__(cls, key):
         if not isinstance(key, int):
             raise TypeError("BitU index must be an integer")
         if key < 0:
             raise ValueError("BitU index must be non-negative")
         if key > 32:
-            raise ValueError("BitU index must be less than 32")
-        return type(f"BitU[{key}]", (BitU, ), {"size": MemUnit(key)})
+            raise ValueError("BitU index must be at most 32")
+        return Annotated[int, _BitU(MemUnit(key))]
 
 
-    def __new__(cls, value, *args, **kwargs):
-        if value < 0:
-            raise ValueError("Unsigned type cannot hold negative value")
-        if value >= 2**cls.size.bits:
-            raise ValueError(f"Value too large for {cls.size.bits} bit unsigned integer")
-        return super().__new__(cls, value)
+def _scalar_type(t: Any) -> _ScalarType | None:
+    if _issubclass(t, Enum):
+        t = getattr(t, "backing_type", None)
+    if get_origin(t) is not Annotated:
+        return None
+    base_type, *metadata = get_args(t)
+    if base_type not in (int, float):
+        return None
 
-    def __str__(self):
-        return "%d" % int(self)
-
-    def __repr__(self):
-        return "BitU%d(%d)" % (self.size.bits, int(self))
-
-    @classmethod
-    def unpack(cls, buffer: memoryview, offset: MemUnit) -> tuple[int, MemUnit]:
-        val = 0
-        byte_index = offset.bits // MemUnit.BITS_PER_BYTE
-        bits_remaining = cls.size.bits
-        bit_position = offset.bits
-        while bits_remaining > 0:
-            bits_to_fill = 8 - (bit_position % 8)
-            bits_to_place = min(bits_remaining, bits_to_fill)
-            shift = bits_to_fill - bits_to_place
-            mask = (1 << bits_to_place) - 1
-            bit_value = (buffer[byte_index] >> shift) & mask
-
-            bit_position += bits_to_place
-            byte_index += 1
-            bits_remaining -= bits_to_place
-
-            val |= bit_value << bits_remaining
-        offset += cls.size
-        return val, offset
-
-    @classmethod
-    def pack(cls, buffer: memoryview, offset: MemUnit, value: int):
-        """Serializes integer numeric type to specific bit offset in the buffer. The value may be packed to lower bit-size."""
-
-        byte_index = offset.bits // MemUnit.BITS_PER_BYTE
-        bits_remaining = cls.size.bits
-        bit_position = offset.bits
-        while bits_remaining > 0:
-            bits_to_fill = MemUnit.BITS_PER_BYTE - (bit_position % MemUnit.BITS_PER_BYTE)
-            bits_to_place = bits_remaining if bits_remaining <= bits_to_fill else bits_to_fill
-            shift = bits_to_fill - bits_to_place
-            mask = (1 << bits_to_place) - 1
-            bit_value = (value >> bits_remaining - bits_to_place) & mask
-            buffer[byte_index] &= ~(mask << shift)
-            buffer[byte_index] |= (bit_value << shift)
-            bit_position += bits_to_place
-            byte_index += 1
-            bits_remaining -= bits_to_place
-        offset += cls.size
-        return offset
+    info = None
+    for item in metadata:
+        if isinstance(item, _ScalarType):
+            if info is not None and info != item:
+                raise TypeError("Conflicting Compost numeric annotations")
+            info = item
+    return info
 
 
-_NUMERIC_PRIMITIVE_TYPES = (
-    U64,
-    I64,
-    U32,
-    I32,
-    U16,
-    I16,
-    U8,
-    I8,
-    F32,
-    F64
-)
 
-_SUPPORTED_PRIMITIVE_TYPES = (
-    *_NUMERIC_PRIMITIVE_TYPES,
-    str,
-    bytes,
-)
+def _is_bitint(t: Any) -> bool:
+    return isinstance(_scalar_type(t), _BitU)
+
+
+def _type_size(t: Any) -> MemUnit:
+    info = _scalar_type(t)
+    if info is not None:
+        return info.size
+    if _issubclass(t, _CompostStruct):
+        return t.size
+    raise TypeError(f"Unsupported fixed-size type: {t}")
+
+
+def _unpack_bitu(buffer: memoryview, offset: MemUnit, bits: int) -> tuple[int, MemUnit]:
+    val = 0
+    byte_index = offset.bits // MemUnit.BITS_PER_BYTE
+    bits_remaining = bits
+    bit_position = offset.bits
+    while bits_remaining > 0:
+        bits_to_fill = MemUnit.BITS_PER_BYTE - (bit_position % MemUnit.BITS_PER_BYTE)
+        bits_to_place = min(bits_remaining, bits_to_fill)
+        shift = bits_to_fill - bits_to_place
+        mask = (1 << bits_to_place) - 1
+        bit_value = (buffer[byte_index] >> shift) & mask
+
+        bit_position += bits_to_place
+        byte_index += 1
+        bits_remaining -= bits_to_place
+
+        val |= bit_value << bits_remaining
+    return val, offset + MemUnit(bits)
+
+
+def _pack_bitu(buffer: memoryview, offset: MemUnit, bits: int, value: int) -> MemUnit:
+    if not isinstance(value, int):
+        raise TypeError("BitU value must be an integer")
+    if not 0 <= value < 2**bits:
+        raise ValueError(f"Value out of range for {bits} bit unsigned integer")
+    byte_index = offset.bits // MemUnit.BITS_PER_BYTE
+    bits_remaining = bits
+    bit_position = offset.bits
+    while bits_remaining > 0:
+        bits_to_fill = MemUnit.BITS_PER_BYTE - (bit_position % MemUnit.BITS_PER_BYTE)
+        bits_to_place = min(bits_remaining, bits_to_fill)
+        shift = bits_to_fill - bits_to_place
+        mask = (1 << bits_to_place) - 1
+        bit_value = (value >> (bits_remaining - bits_to_place)) & mask
+        buffer[byte_index] &= ~(mask << shift)
+        buffer[byte_index] |= bit_value << shift
+        bit_position += bits_to_place
+        byte_index += 1
+        bits_remaining -= bits_to_place
+    return offset + MemUnit(bits)
+
+
 
 _CUSTOM_USER_TYPES: list[type] = []
 
@@ -522,54 +360,42 @@ def unpack_payload(types: list[type], payload: bytes) -> tuple:
     def _unpack(buffer: memoryview, offset, t: type) -> tuple[list, MemUnit]:
         ret = []
         if _issubclass(t, _CompostStruct):
-            offset.byte_align()
+            offset = offset.byte_align()
             members = []
             for _, member_t in t.__annotations__.items():
                 values, offset = _unpack(buffer, offset, member_t)
                 members.append(*values)
             ret.append(t(*members))
         elif _issubclass(t, (bytes, str)):
+            offset = offset.byte_align()
             (length,) = unpack_from(">H", payload, offset.bytes)
-            offset.bytes += 2
+            offset += MemUnit.from_bytes(2)
             data_bytes = payload[offset.bytes : offset.bytes + length]
             if _issubclass(t, (bytes,)):
                 ret.append(data_bytes)
             if _issubclass(t, (str,)):
                 ret.append(data_bytes.decode())
-            offset.bytes += length
+            offset += MemUnit.from_bytes(length)
         elif get_origin(t) is list:
+            offset = offset.byte_align()
             (length,) = unpack_from(">H", payload, offset.bytes)
-            offset.bytes += 2
-            (inner_type,) = get_args(t)
-            length //= inner_type.size.bytes
+            offset += MemUnit.from_bytes(2)
+            type_info = _list_element_type(t)
             list_ = []
-            for o in range(offset.bytes, offset.bytes + length * inner_type.size.bytes, inner_type.size.bytes):
-                list_.append(*unpack_from(inner_type.fmt, payload, o))
+            for o in range(offset.bytes, offset.bytes + length, type_info.size.bytes):
+                list_.append(*unpack_from(type_info.fmt, payload, o))
             ret.append(list_)
-            offset.bytes += length * inner_type.size.bytes
-        elif _issubclass(t, Enum):
-            if _issubclass(t, BitU):
-                val, offset = t.unpack(memoryview(payload), offset)
-                ret.append(t(val))
-            elif _issubclass(t, I8):
-                ret.append(t(*unpack_from(I8.fmt, payload, offset.bytes)))
-                offset += I8.size
-            elif _issubclass(t, U8):
-                ret.append(t(*unpack_from(U8.fmt, payload, offset.bytes)))
-                offset += U8.size
-            elif _issubclass(t, I16):
-                ret.append(t(*unpack_from(I16.fmt, payload, offset.bytes)))
-                offset += I16.size
+            offset += MemUnit.from_bytes(length)
+        elif (type_info := _scalar_type(t)) is not None:
+            if isinstance(type_info, _BitU):
+                val, offset = _unpack_bitu(buffer, offset, type_info.size.bits)
             else:
-                TypeError("Unsupported enum backing type")
-        elif _issubclass(t, BitU):
-            val, offset = t.unpack(memoryview(payload), offset)
-            ret.append(val)
-        elif _issubclass(t, _NUMERIC_PRIMITIVE_TYPES):
-            ret.append(*unpack_from(t.fmt, payload, offset.bytes))
-            offset += t.size
+                offset = offset.byte_align()
+                (val,) = unpack_from(type_info.fmt, payload, offset.bytes)
+                offset += type_info.size
+            ret.append(t(val) if _issubclass(t, Enum) else val)
         else:
-            TypeError("Unsupported type")
+            raise TypeError(f"Unsupported type: {t}")
         return ret, offset
 
     ret = []
@@ -584,48 +410,39 @@ def pack_payload(types: list[type], *args) -> bytes:
     """Serializes Python objects in arguments to bytes"""
     def _pack(buffer: memoryview, offset: MemUnit, t: type, value) -> MemUnit:
         if _issubclass(t, (_CompostStruct, )):
-            offset.byte_align()
+            offset = offset.byte_align()
             for member_name, member_type in t.__annotations__.items():
                 offset = _pack(buffer, offset, member_type, getattr(value, member_name))
         elif _issubclass(t, (bytes, str)):
-            offset.byte_align()
+            offset = offset.byte_align()
             if _issubclass(t, (str,)):
                 value = str.encode(value)
             value = bytes(value)
             buffer[offset.bytes:offset.bytes+2] = pack(">H", len(value))
-            offset.bytes += 2
+            offset += MemUnit.from_bytes(2)
             buffer[offset.bytes:offset.bytes+len(value)] = value
-            offset.bytes += len(value)
+            offset += MemUnit.from_bytes(len(value))
         elif get_origin(t) is list:
-            offset.byte_align()
+            offset = offset.byte_align()
             if not isinstance(value, list):
                 raise TypeError("value must be of type: list")
-            (inner_type,) = get_args(t)
+            inner_type = _list_element_type(t)
             buffer[offset.bytes:offset.bytes+2] = pack(">H", len(value) * inner_type.size.bytes)
-            offset.bytes += 2
+            offset += MemUnit.from_bytes(2)
             for i in value:
                 buffer[offset.bytes:offset.bytes+inner_type.size.bytes] = pack(inner_type.fmt, i)
                 offset += inner_type.size
-        elif _issubclass(t, (BitU)):
-            offset = t.pack(buffer, offset, value)
-        elif _issubclass(t, _NUMERIC_PRIMITIVE_TYPES):
-            offset.byte_align()
-            buffer[offset.bytes:offset.bytes+t.size.bytes] = pack(t.fmt, value)
-            offset += t.size
-        elif _issubclass(t, Enum):
-            if _issubclass(t, BitU):
-                t.pack(buffer, offset, value)
-                offset += t.size
-            elif _issubclass(t, I8):
-                offset.byte_align()
-                buffer[offset.bytes] = pack(I8.fmt, value.value)
-                offset += I8.size
-            elif _issubclass(t, U8):
-                offset.byte_align()
-                buffer[offset.bytes] = pack(U8.fmt, value.value)
-                offset += U8.size
+        elif (type_info := _scalar_type(t)) is not None:
+            if isinstance(value, Enum):
+                value = value.value
+            if isinstance(type_info, _BitU):
+                offset = _pack_bitu(buffer, offset, type_info.size.bits, value)
+            else:
+                offset = offset.byte_align()
+                buffer[offset.bytes:offset.bytes+type_info.size.bytes] = pack(type_info.fmt, value)
+                offset += type_info.size
         else:
-            raise TypeError("Unsupported type")
+            raise TypeError(f"Unsupported type: {t}")
         return offset
 
     buffer = memoryview(bytearray(1024))
@@ -788,56 +605,55 @@ class Endpoint(Enum):
                 or call.direction == CallDirection.TWO_WAY)
 
 
-def _validate_type(t: type, context: str = ""):
-    error_message_start = "Type" if len(context) == 0 else f"{context} of"
+def _list_element_type(t: Any, context: str = "Type") -> _ByteAlignedScalar:
+    args = get_args(t)
+    if len(args) != 1:
+        raise TypeError(f"{context} list[...] must have exactly one type argument")
+    (inner_type,) = args
+    info = _scalar_type(inner_type)
+    if not isinstance(info, _ByteAlignedScalar) or _issubclass(inner_type, Enum):
+        raise TypeError(f"{context} list[...] may only contain byte-aligned scalars")
+    return info
+
+
+def _validate_type(t: type, context: str):
     if get_origin(t) is list:
-        if len(get_args(t)) != 1:
-            raise TypeError(f"{error_message_start} list[...] must have exactly one type argument")
-        (inner_type,) = get_args(t)
-        if not _issubclass(inner_type, _NUMERIC_PRIMITIVE_TYPES):
-            raise TypeError(f"{error_message_start} list[...] may only contain primitive types")
+        _list_element_type(t, context)
 
-def _is_type_dynamic(t: type):
-    if get_origin(t) is list or _issubclass(t, (bytes, str)):
-        return True
-    elif _issubclass(t, _CompostStruct):
-        return t.dynamic_members
-    else:
-        return False
+def _is_supported_type(t: Any) -> bool:
+    return (isinstance(_scalar_type(t), _ByteAlignedScalar)
+            or _issubclass(t, (str, bytes, _CompostStruct))
+            or get_origin(t) is list)
 
-
-def enum(cls: _C) -> _C:
-    """Decorator for enums to make them usable with Compost RPC defintions.
-
-    Use this for enum definitions ala C.
+def enum(backing_type: Any) -> Callable[[type[_C]], type[_C]]:
+    """Make an integer enum usable with Compost RPC definitions.
 
     Example::
 
-        from compost_rpc import enum
+        from enum import IntEnum
+        from compost_rpc import enum, I8
 
-        @enum
-        class OtaResult(I8, Enum):
+        @enum(I8)
+        class OtaResult(IntEnum):
             OTA_OK = 0
             OTA_ERR = 1
     """
+    info = _scalar_type(backing_type)
+    if (_issubclass(backing_type, Enum)
+            or not (info in (_ByteAlignedScalar.I8, _ByteAlignedScalar.U8, _ByteAlignedScalar.I16)
+                    or isinstance(info, _BitU))):
+        raise TypeError("compost_enum supports only I8, U8, I16 or BitU[n] backing types")
 
-    if not _issubclass(cls, Enum):
-        raise TypeError("compost_enum supports only Enum types")
-    if not _issubclass(cls, (I8, U8, I16, BitU)):
-        raise TypeError("compost_enum supports only I8, U8, I16 or BitInt data type for Enums")
+    def decorate(cls: type[_C]) -> type[_C]:
+        if not _issubclass(cls, Enum) or not _issubclass(cls, int):
+            raise TypeError("compost_enum supports only integer Enum types")
 
-    def __deepcopy__(self,memo):
-        return self
+        cls.backing_type = backing_type
 
-    def __copy__(self):
-        return self
+        _CUSTOM_USER_TYPES.append(cls)
+        return cls
 
-    cls.__deepcopy__ = __deepcopy__
-    cls.__copy__ = __copy__
-    cls.backing_type = cls.__bases__[0]
-
-    _CUSTOM_USER_TYPES.append(cls)
-    return cls
+    return decorate
 
 
 def struct(cls: _C) -> type[_C]:
@@ -870,7 +686,7 @@ def struct(cls: _C) -> type[_C]:
             datacls.layout[-1] = datacls.layout[-1] + MemUnit.from_bytes(2)
             datacls.layout.append(MemUnit(0))
         else:
-            datacls.layout[-1] = datacls.layout[-1] + member_t.size
+            datacls.layout[-1] = datacls.layout[-1] + _type_size(member_t)
 
     datacls.size = MemUnit(0)
     for x in datacls.layout:
@@ -909,20 +725,18 @@ def rpc(rpc_id: int, notification: bool = False, direction: CallDirection = Call
             _, *parameters_items = sig.parameters.items()
             for name, t in parameters_items:
                 _validate_type(t.annotation, "rpc parameter")
-                if _issubclass(t.annotation, (*_SUPPORTED_PRIMITIVE_TYPES, _CompostStruct)) or get_origin(t.annotation) is list:
+                if _is_supported_type(t.annotation):
                     req_types.append(t.annotation)
                 else:
-                    raise TypeError(f'Parameter "{name}" has unsupported type: {t.annotation.__name__}')
+                    raise TypeError(f'Parameter "{name}" has unsupported type: {t.annotation}')
             resp_types = []
             _validate_type(sig.return_annotation, "rpc return value")
             if sig.return_annotation is sig.empty:
                 pass
-            elif get_origin(sig.return_annotation) is list or \
-                _issubclass(sig.return_annotation, (tuple, _CompostStruct)) or \
-                _issubclass(sig.return_annotation, _SUPPORTED_PRIMITIVE_TYPES):
+            elif _is_supported_type(sig.return_annotation):
                 resp_types.append(sig.return_annotation)
             else:
-                raise TypeError(f"Unsupported return type: {sig.return_annotation.__name__}")
+                raise TypeError(f"Unsupported return type: {sig.return_annotation}")
 
             req = PayloadSerdes(req_types)
             resp = PayloadSerdes(resp_types)
@@ -1272,6 +1086,7 @@ class CodeGeneratorFeatures:
         return self._outbound_notification
 
 class CodeGenerator(ABC):
+    _primitive_type_map: dict[Any, str] = {}
     _GENERATION_NOTE: str = """
 /******************************************************************************/
 /*                     G E N E R A T E D   P R O T O C O L                    */
@@ -1286,6 +1101,22 @@ class CodeGenerator(ABC):
         # Public properties, common to all generators - with sensible defaults set
         self._filename: str = self._protocol.__name__
         self._path: Path = Path(sys.path[0])
+
+    def _type(self, t: Any) -> str:
+        """Resolve a language type name without hashing unrelated annotation metadata."""
+        if t is str or t is bytes:
+            return self._primitive_type_map[t]
+        if get_origin(t) is Annotated and (numeric := _scalar_type(t)) is not None:
+            base, *metadata = get_args(t)
+            if len(metadata) > 1:
+                t = Annotated[base, numeric]
+            primitive = self._primitive_type_map.get(t)
+            if primitive is not None:
+                return primitive
+        return self._non_primitive_type(t)
+
+    def _non_primitive_type(self, t: Any) -> str:
+        raise TypeError(f"Unsupported type: {t}")
 
     def _validate_endpoint(self, endpoint: Endpoint):
         for rpc in self._protocol._rpcs.values():
@@ -1442,8 +1273,13 @@ class CCodeGenerator(CodeGenerator):
         bytes: "struct CompostSliceU8"
     }
 
+    @staticmethod
+    def _type_basename(t: type) -> str:
+        numeric = _scalar_type(t)
+        return numeric.name if numeric is not None and not _issubclass(t, Enum) else t.__name__
+
     def _type_name(self, t: type) -> str:
-        return f"{self.type_prefix}{t.__name__}"
+        return f"{self.type_prefix}{self._type_basename(t)}"
 
     def _type_fn_name(self, t: type, helper: str) -> str:
         return f"{self._type_name(t)}_{helper}"
@@ -1455,20 +1291,17 @@ class CCodeGenerator(CodeGenerator):
     def _enum_variant_name(self, t: type[Enum], variant: Enum) -> str:
         return f"{_scase(self._type_name(t))}_{variant.name.upper()}"
 
-    def _ctype(self, t: type) -> str:
-        if t in self._primitive_type_map:
-            return self._primitive_type_map[t]
+    def _non_primitive_type(self, t: type) -> str:
+        if _issubclass(t, Enum):
+            return f"enum {self._type_name(t)}"
         elif get_origin(t) is list:
             inner_type = get_args(t)[0]
-            return f"struct CompostSlice{inner_type.__name__}"
+            return f"struct CompostSlice{self._type_basename(inner_type)}"
         elif _issubclass(t, _CompostStruct):
             return f"struct {self._type_name(t)}"
-        elif _issubclass(t, Enum):
-            return f"enum {self._type_name(t)}"
-        elif _issubclass(t, BitU):
+        elif _is_bitint(t):
             return self._primitive_type_map[U32]
-        else:
-            raise TypeError("Unsupported type")
+        return super()._non_primitive_type(t)
 
     @classmethod
     def _dynamic_member_names(cls, t: type) -> list[str]:
@@ -1484,13 +1317,15 @@ class CCodeGenerator(CodeGenerator):
 
     def _member_default_value(self, struct: type, member_annotation: tuple[str, type]) -> str:
         name, t = member_annotation
-        if t in _NUMERIC_PRIMITIVE_TYPES or _issubclass(t, (BitU, )):
+        if _issubclass(t, Enum):
+            return self._enum_variant_name(t, list(t)[0])
+        elif _scalar_type(t) is not None:
             return "0"
         elif _issubclass(t, (str, bytes)):
             return self._member_default_value(t, (name, list[U8]))
         elif get_origin(t) is list:
             inner_type = get_args(t)[0]
-            return f"compost_slice_{inner_type.__name__.lower()}_new(alloc, {name}_len)"
+            return f"compost_slice_{self._type_basename(inner_type).lower()}_new(alloc, {name}_len)"
         elif _issubclass(t, _CompostStruct):
             len_names = ["alloc"] if t.dynamic_members else []
             for x in self._dynamic_member_names(t):
@@ -1499,8 +1334,6 @@ class CCodeGenerator(CodeGenerator):
                         len_names.append(f"{y}_len")
                         break
             return f"{self._type_fn_name(t, 'init')}({', '.join(len_names)})"
-        elif _issubclass(t, Enum):
-            return self._enum_variant_name(t, list(t)[0])
         else:
             raise TypeError("Unsupported type")
 
@@ -1510,14 +1343,14 @@ class CCodeGenerator(CodeGenerator):
         prototype_params = ["struct CompostCtx *ctx"]
         parameters_items = rpc.get_param_items()
         for name, typ in parameters_items:
-            prototype_params.append(f"{self._ctype(typ.annotation)} {name}")
+            prototype_params.append(f"{self._type(typ.annotation)} {name}")
             call_site_params.append(f"l_{name}")
         if sig.return_annotation is sig.empty:
             return_type = "void"
         elif rpc.is_notification:
             raise TypeError("Notification return value must be None")
         else:
-            return_type = self._ctype(sig.return_annotation)
+            return_type = self._type(sig.return_annotation)
         result_assignment = f"{return_type} ret = " if return_type != "void" else ""
         handler_name = self._rpc_fn_name(rpc, "handler")
         call_site = f"{result_assignment}{handler_name}({', '.join(call_site_params)});"
@@ -1548,7 +1381,7 @@ struct CompostAlloc {type_name}_alloc_init(uint8_t *tx_buf, uint16_t tx_buf_len)
 }}
 """
             # init generation
-            self._type_inits_proto += f"{self._ctype(t)} {type_name}_init({', '.join(init_fn_args) if init_fn_args else 'void'});\n\n"
+            self._type_inits_proto += f"{self._type(t)} {type_name}_init({', '.join(init_fn_args) if init_fn_args else 'void'});\n\n"
             init_fn_member_init = [f".{member[0]} = {self._member_default_value(t, member)}" for member in t.__annotations__.items()]
             init_fn_member_init = ',\n        '.join(init_fn_member_init)
             self._type_inits += f"""
@@ -1563,11 +1396,11 @@ struct {type_name} {type_name}_init({', '.join(init_fn_args) if init_fn_args els
             is_store = helper == "store"
             fn = self._serdes_fn(t, helper)
             # load
-            fn_proto = f"{self._ctype(t)} {fn}(const uint8_t ** src)"
+            fn_proto = f"{self._type(t)} {fn}(const uint8_t ** src)"
             fn_call = self._load_call
             iter_ptr = "src"
             if is_store: #store
-                fn_proto = f"void {fn}(uint8_t** dest, {self._ctype(t)}* src)"
+                fn_proto = f"void {fn}(uint8_t** dest, {self._type(t)}* src)"
                 fn_call = self._store_call
                 iter_ptr = "dest"
             code = _String(indent=0)
@@ -1577,13 +1410,14 @@ struct {type_name} {type_name}_init({', '.join(init_fn_args) if init_fn_args els
             ))
             code.indent_inc()
             if not is_store:
-                code.add((f"{self._ctype(t)} ret;"))
+                code.add((f"{self._type(t)} ret;"))
             offset = MemUnit()
             for member_name, member_t in t.__annotations__.items():
                 member_path = f"src->{member_name}" if is_store else f"ret.{member_name}"
-                if _issubclass(member_t, BitU):
-                    code.add(fn_call(member_t, member_path, f"*{iter_ptr}", extra_args=[offset.bits, member_t.size.bits]))
-                    offset += member_t.size
+                if _is_bitint(member_t):
+                    member_size = _type_size(member_t)
+                    code.add(fn_call(member_t, member_path, f"*{iter_ptr}", extra_args=[offset.bits, member_size.bits]))
+                    offset += member_size
                 else:
                     try:
                         code, offset = self._byte_align(code, offset, ptr=f"*{iter_ptr}")
@@ -1602,14 +1436,14 @@ struct {type_name} {type_name}_init({', '.join(init_fn_args) if init_fn_args els
     def _define_types(self) -> None:
         for t in _CUSTOM_USER_TYPES:
             if _issubclass(t, _CompostStruct):
-                self._structs += f"\n\n{self._ctype(t)} {{\n"
+                self._structs += f"\n\n{self._type(t)} {{\n"
                 for member in t.__annotations__.items():
                     member_name, member_t = member
-                    if _issubclass(member_t, (BitU, )):
-                        self._structs += f"    {self._ctype(member_t)} {member_name} : {member_t.size.bits};\n"
+                    if _is_bitint(member_t):
+                        self._structs += f"    {self._type(member_t)} {member_name} : {_type_size(member_t).bits};\n"
                     else:
                         try:
-                            self._structs += f"    {self._ctype(member_t)} {member_name};\n"
+                            self._structs += f"    {self._type(member_t)} {member_name};\n"
                         except TypeError:
                             #rethrow with more specific error message
                             raise TypeError(f'Unsupported type of compost_struct attribute "{member_name}": {member_t.__name__}')
@@ -1618,25 +1452,26 @@ struct {type_name} {type_name}_init({', '.join(init_fn_args) if init_fn_args els
             elif _issubclass(t, Enum):
                 sep = ",\n"
                 self._enums += f"""
-{self._ctype(t)} {{
+{self._type(t)} {{
 {sep.join(f"    {self._enum_variant_name(t, variant)} = {variant.value}" for variant in t)}
 }};
 """
 
     def _serdes_fn(self, t: type, suffix: str) -> str:
         fn = ""
-        if t in _NUMERIC_PRIMITIVE_TYPES:
-            tstr = t.__name__.lower()
-            fn = f"compost_{tstr}_{suffix}"
-        elif _issubclass(t, Enum):
+        numeric = _scalar_type(t)
+        if _issubclass(t, Enum):
             return self._serdes_fn(t.backing_type, suffix)
+        elif isinstance(numeric, _BitU):
+            fn = f"compost_bituint_{suffix}"
+        elif numeric is not None:
+            tstr = numeric.name.lower()
+            fn = f"compost_{tstr}_{suffix}"
         elif _issubclass(t, (bytes, str)):
             fn = f"compost_slice_u8_{suffix}"
         elif get_origin(t) is list:
-            inner_type = get_args(t)[0].__name__.lower()
+            inner_type = self._type_basename(get_args(t)[0]).lower()
             fn = f"compost_slice_{inner_type}_{suffix}"
-        elif _issubclass(t, BitU):
-            fn = f"compost_bituint_{suffix}"
         elif _issubclass(t, _CompostStruct):
             fn = self._type_fn_name(t, suffix)
         else:
@@ -1659,15 +1494,14 @@ struct {type_name} {type_name}_init({', '.join(init_fn_args) if init_fn_args els
             self._define_type_helper(t, "load")
         args = [src]
         args.extend([str(x) for x in extra_args])
-        return f"{'' if '.' in dest else f'{self._ctype(t)} '}{dest} = {fn_name}({', '.join(args)});"
+        return f"{'' if '.' in dest else f'{self._type(t)} '}{dest} = {fn_name}({', '.join(args)});"
 
     @staticmethod
     def _byte_align(code: _String, offset: MemUnit, ptr: str) -> tuple[_String, MemUnit]:
-        offset.byte_align()
+        offset = offset.byte_align()
         if offset.bytes:
             code.add(f"{ptr} += {offset.bytes};")
-            offset.bytes = 0
-        return code, offset
+        return code, MemUnit()
 
     def generate(self, endpoint: Endpoint = Endpoint.REMOTE) -> list[tuple[Path, str]]:
         self._validate_endpoint(endpoint)
@@ -1706,7 +1540,7 @@ enum RpcId {{
         for notif in self._protocol._rpcs.values():
             if not notif.is_notification or not endpoint.is_call_outbound(notif):
                 continue
-            params = [f"{self._ctype(param_type.annotation)} {param_name}" for param_name, param_type in notif.get_param_items()]
+            params = [f"{self._type(param_type.annotation)} {param_name}" for param_name, param_type in notif.get_param_items()]
             params = ", " + ", ".join(params) if params else ""
             serializer_name = self._rpc_fn_name(notif, "store")
             protocol_header += f"""
@@ -1915,19 +1749,15 @@ class CSharpCodeGenerator(CodeGenerator):
         bytes: "List<byte>"
     }
 
-    @classmethod
-    def _type(cls, t: type) -> str:
-        if t in cls._primitive_type_map:
-            return cls._primitive_type_map[t]
+    def _non_primitive_type(self, t: type) -> str:
+        if _issubclass(t, (Enum, _CompostStruct)):
+            return t.__name__
         elif get_origin(t) is list:
             inner_type = get_args(t)[0]
-            return f"List<{cls._type(inner_type)}>"
-        elif _issubclass(t, (Enum, _CompostStruct)):
-            return f"{t.__name__}"
-        elif _issubclass(t, (BitU)):
-            return "ulong" if t.size.bits >= 32 else "uint"
-        else:
-            raise TypeError("Unsupported type")
+            return f"List<{self._type(inner_type)}>"
+        elif isinstance(numeric := _scalar_type(t), _BitU):
+            return "ulong" if numeric.size.bits >= 32 else "uint"
+        return super()._non_primitive_type(t)
 
     def _type_definition(self) -> str:
         cs_types = ""
@@ -1935,8 +1765,8 @@ class CSharpCodeGenerator(CodeGenerator):
             if _issubclass(t, _CompostStruct):
                 cs_types += f"\npublic class {t.__name__}\n{{\n"
                 for member_name, member_t in t.__annotations__.items():
-                    if _issubclass(member_t, BitU):
-                        cs_types += f"    [Pack({member_t.size.bits})]\n"
+                    if _is_bitint(member_t):
+                        cs_types += f"    [Pack({_type_size(member_t).bits})]\n"
                         cs_types += f"    public {self._type(member_t)} {_pcase(member_name)} {{ get; set; }}\n"
                     elif _issubclass(member_t, str):
                         cs_types += f"    public string {_pcase(member_name)} {{ get; set; }} = string.Empty;\n"

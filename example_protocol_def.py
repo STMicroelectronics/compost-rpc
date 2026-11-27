@@ -10,26 +10,26 @@ compost. These types are C compatible and are statically sized. Do not put any
 code into the remote function body.
 """
 
-from enum import Enum
+from enum import IntEnum
 from compost_rpc import Protocol, Generator
 from compost_rpc import rpc, notification, struct, enum
 from compost_rpc import U32, U16, U8, F32
 
 
-@enum
-class Result(U8, Enum):
+@enum(U8)
+class Result(IntEnum):
     OK = 0
     ERR = 1
 
 
-@enum
-class LedState(U8, Enum):
+@enum(U8)
+class LedState(IntEnum):
     OFF = 0
     ON = 1
 
 
-@enum
-class TofProperty(U8, Enum):
+@enum(U8)
+class TofProperty(IntEnum):
     ZONE_DISTANCE = 0
     ZONE_ENERGY = 1
     ZONE_TARGET_COUNT = 2

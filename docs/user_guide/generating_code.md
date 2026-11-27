@@ -146,8 +146,11 @@ automatically for C by the generator.
 ```{code-block} python
 :caption: Correct enum definition ✅
 
-@compost_enum
-class Color(I8, Enum):
+from enum import IntEnum
+from compost_rpc import I8, enum as compost_enum
+
+@compost_enum(I8)
+class Color(IntEnum):
     RED = 1
     GREEN = 2
     BLUE = 3
@@ -156,8 +159,11 @@ class Color(I8, Enum):
 ```{code-block} python
 :caption: Incorrect enum definition ❌
 
-@compost_enum
-class Color(I8, Enum):
+from enum import IntEnum
+from compost_rpc import I8, enum as compost_enum
+
+@compost_enum(I8)
+class Color(IntEnum):
     COLOR_RED = 1
     COLOR_GREEN = 2
     COLOR_BLUE = 3

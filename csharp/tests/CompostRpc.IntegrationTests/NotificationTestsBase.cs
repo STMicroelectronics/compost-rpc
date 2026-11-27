@@ -58,12 +58,12 @@ public abstract class NotificationTestsBase
     }
 
     [Fact]
-    public async Task NotifyNestedBitfieldsByTriggerRpcTest()
+    public async Task NotifyNestedBitintsByTriggerRpcTest()
     {
-        _unit.NotifyBitfields += (a, b) => _notificationArgs.Post((a, b));
+        _unit.NotifyBitints += (a, b) => _notificationArgs.Post((a, b));
         await _unit.TriggerNotificationAsync(0xe04);
 
-        (BitfieldStruct a, NestedBitfieldStruct b) = await FetchNotificationArg<(BitfieldStruct, NestedBitfieldStruct)>();
+        (BitIntStruct a, NestedBitIntStruct b) = await FetchNotificationArg<(BitIntStruct, NestedBitIntStruct)>();
         Assert.Equal(0U, a.Channel);
         Assert.Equal(1U, a.Inom);
         Assert.Equal(1U, a.Tnom);
